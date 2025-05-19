@@ -337,6 +337,26 @@ TABLES_QUERY = queries = [
             cs.estado_registro,
             cs.fecha_creacion_clt;
     """
-        }
+        },
+          {
+            "table": "sistema_informacion_gerencial.dm_expediente",
+            "query": """
+            select
+                cs.anio as  ano_eje,
+                ef.sec_ejec,
+                ef.certificado,
+                ef.expediente,
+                ef.ciclo,
+                ef.fase,
+                ef.secuencia,
+                ef.certificado_secuencia,
+                ef.monto_nacional,
+                ef.cod_doc_ref as cod_doc,
+                ef.num_doc_ref as num_doc
+                from sistema_informacion_gerencial.hechos_institucional_consolidados cs
+                inner join bytsscom_bytsiaf.expediente_fase ef on cs.num_certificado = ef.certificado
+                and ef.ano_eje = cs.anio::varchar
+    """
+        },
 ]
 

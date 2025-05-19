@@ -169,6 +169,6 @@ def load(rows_tables: List[Dict]):
 
 
 if __name__ == "__main__":
-    #extract()
+    extract()
     rows_tables = transform()
     load(rows_tables)
