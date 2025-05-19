@@ -7,6 +7,7 @@ def load_table_configs() -> List[TableConfig]:
         key = info["key"]
         configs.append(
             TableConfig(
+                key= info["key"],
                 table=info["table"],
                 path=info["path"],
                 columns=BASE_COLUMNS[key],

@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from typing import Any, Callable, Dict, Iterable, List, Optional
 class TableConfig(BaseSettings):
+    key:str
     table: str
     path: str
     columns: List[str]

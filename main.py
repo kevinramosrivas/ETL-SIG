@@ -6,26 +6,10 @@ from typing import Any, Callable, Dict, Iterable, List, Optional
 from utils.load_tables_config import load_table_configs
 from utils.filter import build_filter
 from dbfread2 import DBF
-import psycopg2
-import psycopg2.extras
-from pydantic_settings import BaseSettings
 from prefect import flow, task, get_run_logger
 from prefect.cache_policies import NO_CACHE
-
-
-class Settings(BaseSettings):
-    db_name: str
-    db_user: str
-    db_password: str
-    db_host: str = "localhost"
-    db_port: int = 5432
-    data_dir: str = "DATA"
-
-    class Config:
-        env_file = ".env"
-
-
-settings = Settings()
+from config.settings_config import settings
+from config.database_config import DatabaseConnection
 
 
 
@@ -42,24 +26,18 @@ def read_dbf(path: str) -> Iterable[Dict[str, Any]]:
 
 
 # Deshabilitar cache para la conexión
-@task(retries=3, retry_delay_seconds = 30 , cache_policy=NO_CACHE)
-def connect_db() -> psycopg2.extras.DictCursor:
-    conn = psycopg2.connect(
-        dbname=settings.db_name,
-        user=settings.db_user,
-        password=settings.db_password,
-        host=settings.db_host,
-        port=settings.db_port,
-    )
-    conn.autocommit = True
-    return conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+@task(retries=3, retry_delay_seconds = 30 , cache_policy=NO_CACHE,name="CONEXION_BD")
+def connect_db():
+    logger = get_run_logger()
+    db = DatabaseConnection()
+    logger.info(f"Conexion a la base de datos creada")
+    return db
 
 
 
 # Deshabilitar cache en bulk_load
-@task(retries=1, retry_delay_seconds=10,cache_policy=NO_CACHE)
+@task(retries=1, retry_delay_seconds=10)
 def bulk_load(
-    cursor: psycopg2.extras.DictCursor,
     table: str,
     columns: List[str],
     records: Iterable[Dict[str, Any]],
@@ -70,6 +48,8 @@ def bulk_load(
     logger = get_run_logger()
     start = time.time()
 
+    db = connect_db()
+    cursor = db.connect()
     if truncate:
         cursor.execute(f"TRUNCATE {table} RESTART IDENTITY CASCADE;")
         cursor.execute(f"ALTER TABLE {table} DISABLE TRIGGER ALL;")
@@ -101,13 +81,13 @@ def bulk_load(
 
 @flow
 def etl_sig():
-    cursor = connect_db()
     tables = load_table_configs()
     for cfg in tables:
-        data = read_dbf(cfg.path)
+        read_dbf_task = read_dbf.with_options(name=f"LECTURA-DBF-{cfg.key.upper()}")
+        data = read_dbf_task(cfg.path)
         filter_fn = build_filter(cfg.filter_fields) if cfg.filter_fields else None
-        bulk_load(
-            cursor=cursor,
+        bulk_load_task = bulk_load.with_options(name=f"CARGA-{cfg.key.upper()}")
+        bulk_load_task(
             table=cfg.table,
             columns=cfg.columns,
             records=data,
