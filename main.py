@@ -3,7 +3,8 @@ import csv
 import time
 from io import StringIO
 from typing import Any, Callable, Dict, Iterable, List, Optional
-from config.tables_config import BASE_COLUMNS, BASE_FIELD_MAP, TABLES_INFO
+from utils.load_tables_config import load_table_configs
+from utils.filter import build_filter
 from dbfread2 import DBF
 import psycopg2
 import psycopg2.extras
@@ -27,16 +28,6 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-def build_filter(fields: Dict[str, Optional[List[Any]]]) -> Callable[[Dict[str, Any]], bool]:
-    def _filter(rec: Dict[str, Any]) -> bool:
-        for key, valid in fields.items():
-            if key not in rec or rec.get(key) is None:
-                return False
-            if valid is not None and rec[key] not in valid:
-                return False
-        return True
-
-    return _filter
 
 # Deshabilitar cache devolviendo siempre None en cache_key_fn
 @task(retries=2, retry_delay_seconds=30, cache_policy=NO_CACHE)
@@ -47,6 +38,8 @@ def read_dbf(path: str) -> Iterable[Dict[str, Any]]:
         raise FileNotFoundError(f"DBF file not found: {full_path}")
     logger.info(f"Reading DBF: {full_path}")
     return DBF(full_path, record_factory=dict, encoding="cp1252", char_decode_errors="replace")
+
+
 
 # Deshabilitar cache para la conexión
 @task(retries=3, retry_delay_seconds = 30 , cache_policy=NO_CACHE)
@@ -60,6 +53,8 @@ def connect_db() -> psycopg2.extras.DictCursor:
     )
     conn.autocommit = True
     return conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+
 
 # Deshabilitar cache en bulk_load
 @task(retries=1, retry_delay_seconds=10,cache_policy=NO_CACHE)
@@ -103,31 +98,6 @@ def bulk_load(
     )
     return True
 
-class TableConfig(BaseSettings):
-    table: str
-    path: str
-    columns: List[str]
-    field_map: Optional[Dict[str, str]] = None
-    filter_fields: Optional[Dict[str, Optional[List[Any]]]] = None
-    truncate: bool = True
-
-
-def load_table_configs() -> List[TableConfig]:
-    configs: List[TableConfig] = []
-    for info in TABLES_INFO:
-        key = info["key"]
-        configs.append(
-            TableConfig(
-                table=info["table"],
-                path=info["path"],
-                columns=BASE_COLUMNS[key],
-                field_map=BASE_FIELD_MAP.get(key),
-                filter_fields=info.get("filter_fields"),
-                truncate=True,
-            )
-        )
-    configs.sort(key=lambda c: c.table)
-    return configs
 
 @flow
 def etl_sig():

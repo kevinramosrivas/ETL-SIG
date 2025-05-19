@@ -1,4 +1,12 @@
-# config_master.py
+from pydantic_settings import BaseSettings
+from typing import Any, Callable, Dict, Iterable, List, Optional
+class TableConfig(BaseSettings):
+    table: str
+    path: str
+    columns: List[str]
+    field_map: Optional[Dict[str, str]] = None
+    filter_fields: Optional[Dict[str, Optional[List[Any]]]] = None
+    truncate: bool = True
 
 # Diccionario maestro de columnas por clave lógica
 BASE_COLUMNS = {
