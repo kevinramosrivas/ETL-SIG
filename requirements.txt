@@ -1,0 +1,4 @@
+dbfread2
+psycopg2
+python-dotenv
+prefect
