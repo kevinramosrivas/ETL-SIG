@@ -164,7 +164,8 @@ def transform():
 @flow()
 def load(rows_tables: List[Dict]):
     for table in rows_tables:
-        load_data_table(table["data"],table["columns"],table["table"])
+        load_data_table_task = load_data_table.with_options(name=f"CARGA-{table["table"].upper()}")
+        load_data_table_task(table["data"],table["columns"],table["table"])
 
 
 if __name__ == "__main__":
