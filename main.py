@@ -162,12 +162,12 @@ def transform():
         )
     return rows_tables
 @flow()
-def load(rows_table: List[Dict]):
+def load(rows_tables: List[Dict]):
     for table in rows_tables:
         load_data_table(table["data"],table["columns"],table["table"])
 
 
 if __name__ == "__main__":
-    extract()
+    #extract()
     rows_tables = transform()
     load(rows_tables)

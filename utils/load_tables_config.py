@@ -16,7 +16,6 @@ def load_table_configs() -> List[TableConfig]:
                 truncate=True,
             )
         )
-    configs.sort(key=lambda c: c.table)
     return configs
 
 def load_query_tables() -> List[TableQuery]:
@@ -28,5 +27,4 @@ def load_query_tables() -> List[TableQuery]:
                 query= info["query"],
             )
         )
-    configs.sort(key=lambda c: c.table)
     return configs
