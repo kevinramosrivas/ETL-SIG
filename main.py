@@ -14,31 +14,32 @@ from config.database_config import DatabaseConnection
 from utils.list_to_tuple import list_to_tuple_string
 
 
-
-
-# Deshabilitar cache devolviendo siempre None en cache_key_fn
+# Tarea para leer archivos DBF sin cache\@
 @task(retries=2, retry_delay_seconds=30)
 def read_dbf(path: str) -> Iterable[Dict[str, Any]]:
     logger = get_run_logger()
+    logger.info(f"Iniciando lectura de DBF: {path}")
     full_path = os.path.join(settings.data_dir, path)
     if not os.path.exists(full_path):
-        raise FileNotFoundError(f"DBF file not found: {full_path}")
-    logger.info(f"Reading DBF: {full_path}")
-    return DBF(full_path, record_factory=dict, encoding="cp1252", char_decode_errors="replace")
+        logger.error(f"Archivo DBF no encontrado: {full_path}")
+        raise FileNotFoundError(f"DBF no encontrado: {full_path}")
+    logger.info(f"Leyendo DBF desde ruta: {full_path}")
+    records = DBF(full_path, record_factory=dict, encoding="cp1252", char_decode_errors="replace")
+    logger.info(f"Lectura completada: {len(list(records))} registros cargados (evaluación previa).")
+    return records
 
 
-
-# Deshabilitar cache para la conexión
-@task(retries=3, retry_delay_seconds = 30,name="CONEXION_BD",cache_policy=NO_CACHE)
-def connect_db():
+# Tarea para crear conexión a BD sin cache\@
+@task(retries=3, retry_delay_seconds=30, name="CONEXION_BD", cache_policy=NO_CACHE)
+def connect_db() -> DatabaseConnection:
     logger = get_run_logger()
+    logger.info("Creando conexión a la base de datos...")
     db = DatabaseConnection()
-    logger.info(f"Conexion a la base de datos creada")
+    logger.info("Conexión a la base de datos establecida correctamente.")
     return db
 
 
-
-# Deshabilitar cache en bulk_load
+# Tarea para carga masiva de datos\@
 @task(retries=1, retry_delay_seconds=10)
 def bulk_load(
     table: str,
@@ -47,13 +48,16 @@ def bulk_load(
     field_map: Optional[Dict[str, str]] = None,
     filter_fn: Optional[Callable[[Dict[str, Any]], bool]] = None,
     truncate: bool = False,
-):
+) -> bool:
     logger = get_run_logger()
-    start = time.time()
+    logger.info(f"Iniciando bulk_load en tabla {table}. Truncate={truncate}.")
+    start_time = time.time()
 
     db = connect_db()
     cursor = db.connect()
+
     if truncate:
+        logger.info(f"Truncando tabla {table} y deshabilitando triggers...")
         cursor.execute(f"TRUNCATE {table} RESTART IDENTITY CASCADE;")
         cursor.execute(f"ALTER TABLE {table} DISABLE TRIGGER ALL;")
 
@@ -71,74 +75,78 @@ def bulk_load(
     buf.seek(0)
 
     cols_sql = ", ".join(columns)
+    logger.info(f"Copiando {count} registros a {table} usando COPY...")
     cursor.copy_expert(f"COPY {table} ({cols_sql}) FROM STDIN WITH (FORMAT csv, HEADER TRUE)", buf)
 
     if truncate:
+        logger.info(f"Rehabilitando triggers en tabla {table}...")
         cursor.execute(f"ALTER TABLE {table} ENABLE TRIGGER ALL;")
 
-    logger.info(
-        f"Loaded {count} rows into {table} in {round(time.time() - start, 2)}s"
-    )
+    elapsed = round(time.time() - start_time, 2)
+    logger.info(f"Bulk_load completado: {count} registros cargados en {table} en {elapsed} segundos.")
     return True
-# Deshabilitar cache en bulk_load
+
+
+# Tarea para ejecutar consultas\@
 @task(retries=2, retry_delay_seconds=10)
 def execute_query(sql_query: str):
+    logger = get_run_logger()
+    logger.info("Ejecutando consulta SQL...")
     db = connect_db()
     cursor = db.connect()
-    # Ejecutar consulta y obtener datos
     cursor.execute(sql_query)
     data = cursor.fetchall()
-    # Obtener nombres de columnas
     columns = [desc[0] for desc in cursor.description]
+    logger.info(f"Consulta ejecutada: {len(data)} filas obtenidas.")
+    return data, columns
 
-    return data,columns
 
+# Tarea para transformar y cargar datos desde consulta a tabla destino\@
 @task(retries=3, retry_delay_seconds=20)
-def load_data_table(data:list,columns:list,name_table_target:str):
-    db = connect_db()
-    cursor = db.connect()
+def load_data_table(name_table_target: str, sql_query: str) -> None:
+    logger = get_run_logger()
+    logger.info(f"Iniciando transformación y carga en tabla destino: {name_table_target}")
     try:
-        # Truncar tabla y deshabilitar triggers
+        data, columns = execute_query.with_options(name=f"TRANSFORMA-{name_table_target}")(sql_query)
+
+        db = connect_db()
+        cursor = db.connect()
+        logger.info(f"Preparando truncado y deshabilitación de triggers en {name_table_target}...")
         cursor.execute(f"TRUNCATE TABLE {name_table_target} RESTART IDENTITY CASCADE;")
         cursor.execute(f"ALTER TABLE {name_table_target} DISABLE TRIGGER ALL;")
 
-        # Preparar buffer CSV
         buffer = io.StringIO()
         for row in data:
-            # Sustituir None o 'None' por marcador NULL '\\N'
             values = [item if isinstance(item, str) and item not in ('None', '') else ('\\N' if item is None or item == 'None' else str(item)) for item in row]
             line = list_to_tuple_string(values)
             buffer.write(line + "\n")
         buffer.seek(0)
 
-        # Ejecutar COPY con NULL marcador '\\N'
         cols_formatted = ', '.join(columns)
-        copy_sql = f"""
+        logger.info(f"Ejecutando COPY para {name_table_target} con marcador NULL...")
+        cursor.copy_expert(f"""
             COPY {name_table_target} ({cols_formatted})
             FROM STDIN WITH (FORMAT csv, DELIMITER ',', NULL '\\N');
-        """
-        cursor.copy_expert(copy_sql, buffer)
+        """, buffer)
 
-        # Rehabilitar triggers
         cursor.execute(f"ALTER TABLE {name_table_target} ENABLE TRIGGER ALL;")
-
-        print(f"Datos copiados a la tabla {name_table_target} correctamente.")
-
+        logger.info(f"Carga en tabla {name_table_target} completada exitosamente.")
     except Exception as e:
-        print(f"Error al cargar datos en {name_table_target}: {e}")
+        logger.error(f"Error al cargar datos en {name_table_target}: {e}")
         cursor.connection.rollback()
         raise
 
 
-@flow
-def extract():
+@flow(name="ETL_SINCRONIZADO")
+def etl_sig() -> None:
+    # ETAPA EXTRACT
     tables = load_table_configs()
     for cfg in tables:
-        read_dbf_task = read_dbf.with_options(name=f"LECTURA-DBF-{cfg.key.upper()}")
-        data = read_dbf_task(cfg.path)
+        read_task = read_dbf.with_options(name=f"LECTURA-DBF-{cfg.key.upper()}")
+        data = read_task(cfg.path)
         filter_fn = build_filter(cfg.filter_fields) if cfg.filter_fields else None
-        bulk_load_task = bulk_load.with_options(name=f"CARGA-{cfg.key.upper()}")
-        bulk_load_task(
+        bulk_task = bulk_load.with_options(name=f"CARGA-INFO-{cfg.key.upper()}")
+        bulk_task(
             table=cfg.table,
             columns=cfg.columns,
             records=data,
@@ -147,28 +155,12 @@ def extract():
             truncate=cfg.truncate,
         )
 
-@flow()
-def transform():
-    tables =  load_query_tables()
-    rows_tables = []
-    for table in tables:
-        data, columns = execute_query(table.query)
-        rows_tables.append(
-            {
-                "table":table.table,
-                "data":data,
-                "columns":columns
-            }
-        )
-    return rows_tables
-@flow()
-def load(rows_tables: List[Dict]):
-    for table in rows_tables:
-        load_data_table_task = load_data_table.with_options(name=f"CARGA-{table["table"].upper()}")
-        load_data_table_task(table["data"],table["columns"],table["table"])
+    # ETAPA TRANSFORM & LOAD
+    query_tables = load_query_tables()
+    for table in query_tables:
+        load_task = load_data_table.with_options(name=f"CARGA-QUERY-{table.table}")
+        load_task(table.table, table.query)
 
 
 if __name__ == "__main__":
-    extract()
-    rows_tables = transform()
-    load(rows_tables)
+    etl_sig()
