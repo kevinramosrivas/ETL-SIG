@@ -1,20 +1,23 @@
+import io
 import os
 import csv
 import time
 from io import StringIO
 from typing import Any, Callable, Dict, Iterable, List, Optional
-from utils.load_tables_config import load_table_configs
+from utils.load_tables_config import load_table_configs, load_query_tables
 from utils.filter import build_filter
 from dbfread2 import DBF
 from prefect import flow, task, get_run_logger
 from prefect.cache_policies import NO_CACHE
 from config.settings_config import settings
 from config.database_config import DatabaseConnection
+from utils.list_to_tuple import list_to_tuple_string
+
 
 
 
 # Deshabilitar cache devolviendo siempre None en cache_key_fn
-@task(retries=2, retry_delay_seconds=30, cache_policy=NO_CACHE)
+@task(retries=2, retry_delay_seconds=30)
 def read_dbf(path: str) -> Iterable[Dict[str, Any]]:
     logger = get_run_logger()
     full_path = os.path.join(settings.data_dir, path)
@@ -26,7 +29,7 @@ def read_dbf(path: str) -> Iterable[Dict[str, Any]]:
 
 
 # Deshabilitar cache para la conexión
-@task(retries=3, retry_delay_seconds = 30 , cache_policy=NO_CACHE,name="CONEXION_BD")
+@task(retries=3, retry_delay_seconds = 30,name="CONEXION_BD",cache_policy=NO_CACHE)
 def connect_db():
     logger = get_run_logger()
     db = DatabaseConnection()
@@ -77,10 +80,58 @@ def bulk_load(
         f"Loaded {count} rows into {table} in {round(time.time() - start, 2)}s"
     )
     return True
+# Deshabilitar cache en bulk_load
+@task(retries=2, retry_delay_seconds=10)
+def execute_query(sql_query: str):
+    db = connect_db()
+    cursor = db.connect()
+    # Ejecutar consulta y obtener datos
+    cursor.execute(sql_query)
+    data = cursor.fetchall()
+    # Obtener nombres de columnas
+    columns = [desc[0] for desc in cursor.description]
+
+    return data,columns
+
+@task(retries=3, retry_delay_seconds=20)
+def load_data_table(data:list,columns:list,name_table_target:str):
+    db = connect_db()
+    cursor = db.connect()
+    try:
+        # Truncar tabla y deshabilitar triggers
+        cursor.execute(f"TRUNCATE TABLE {name_table_target} RESTART IDENTITY CASCADE;")
+        cursor.execute(f"ALTER TABLE {name_table_target} DISABLE TRIGGER ALL;")
+
+        # Preparar buffer CSV
+        buffer = io.StringIO()
+        for row in data:
+            # Sustituir None o 'None' por marcador NULL '\\N'
+            values = [item if isinstance(item, str) and item not in ('None', '') else ('\\N' if item is None or item == 'None' else str(item)) for item in row]
+            line = list_to_tuple_string(values)
+            buffer.write(line + "\n")
+        buffer.seek(0)
+
+        # Ejecutar COPY con NULL marcador '\\N'
+        cols_formatted = ', '.join(columns)
+        copy_sql = f"""
+            COPY {name_table_target} ({cols_formatted})
+            FROM STDIN WITH (FORMAT csv, DELIMITER ',', NULL '\\N');
+        """
+        cursor.copy_expert(copy_sql, buffer)
+
+        # Rehabilitar triggers
+        cursor.execute(f"ALTER TABLE {name_table_target} ENABLE TRIGGER ALL;")
+
+        print(f"Datos copiados a la tabla {name_table_target} correctamente.")
+
+    except Exception as e:
+        print(f"Error al cargar datos en {name_table_target}: {e}")
+        cursor.connection.rollback()
+        raise
 
 
 @flow
-def etl_sig():
+def extract():
     tables = load_table_configs()
     for cfg in tables:
         read_dbf_task = read_dbf.with_options(name=f"LECTURA-DBF-{cfg.key.upper()}")
@@ -96,5 +147,27 @@ def etl_sig():
             truncate=cfg.truncate,
         )
 
+@flow()
+def transform():
+    tables =  load_query_tables()
+    rows_tables = []
+    for table in tables:
+        data, columns = execute_query(table.query)
+        rows_tables.append(
+            {
+                "table":table.table,
+                "data":data,
+                "columns":columns
+            }
+        )
+    return rows_tables
+@flow()
+def load(rows_table: List[Dict]):
+    for table in rows_tables:
+        load_data_table(table["data"],table["columns"],table["table"])
+
+
 if __name__ == "__main__":
-    etl_sig()
+    extract()
+    rows_tables = transform()
+    load(rows_tables)
