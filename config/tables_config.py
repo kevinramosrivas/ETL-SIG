@@ -351,6 +351,7 @@ TABLES_QUERY = queries = [
                 ef.secuencia,
                 ef.certificado_secuencia,
                 ef.monto_nacional,
+                ef.monto_saldo,
                 ef.cod_doc_ref as cod_doc,
                 ef.num_doc_ref as num_doc
                 from sistema_informacion_gerencial.hechos_institucional_consolidados cs
