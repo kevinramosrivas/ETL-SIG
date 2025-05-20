@@ -165,6 +165,8 @@ def transform_load():
 
 @flow(name="ETL-SIG")
 def etl_sig() -> None:
+    ruta_actual = os.getcwd()
+    print("La ruta actual es:", ruta_actual)
     extract()
     transform_load()
     db =  connect_db()
@@ -172,4 +174,4 @@ def etl_sig() -> None:
 
 
 if __name__ == "__main__":
-    etl_sig()
+    etl_sig.serve(name="ETL-SIG-DEPLOYMENT",cron="0 0 * * *")
