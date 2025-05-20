@@ -167,6 +167,8 @@ def transform_load():
 def etl_sig() -> None:
     extract()
     transform_load()
+    db =  connect_db()
+    db.close()
 
 
 if __name__ == "__main__":
