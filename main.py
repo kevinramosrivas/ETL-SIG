@@ -136,10 +136,9 @@ def load_data_table(name_table_target: str, sql_query: str) -> None:
         cursor.connection.rollback()
         raise
 
-
-@flow(name="ETL_SINCRONIZADO")
-def etl_sig() -> None:
-    # ETAPA EXTRACT
+@flow(name="ETL-SIG:Extraccion")
+def extract() -> None:
+        # ETAPA EXTRACT
     tables = load_table_configs()
     for cfg in tables:
         read_task = read_dbf.with_options(name=f"LECTURA-DBF-{cfg.key.upper()}")
@@ -153,13 +152,21 @@ def etl_sig() -> None:
             field_map=cfg.field_map,
             filter_fn=filter_fn,
             truncate=cfg.truncate,
-        )
+    )
 
+@flow(name="ETL-SIG:Transformacion_carga")
+def transform_load():
     # ETAPA TRANSFORM & LOAD
     query_tables = load_query_tables()
     for table in query_tables:
         load_task = load_data_table.with_options(name=f"CARGA-QUERY-{table.table}")
         load_task(table.table, table.query)
+
+
+@flow(name="ETL-SIG")
+def etl_sig() -> None:
+    extract()
+    transform_load()
 
 
 if __name__ == "__main__":
