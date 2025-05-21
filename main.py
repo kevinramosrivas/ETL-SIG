@@ -15,7 +15,7 @@ from config.database_config import DatabaseConnection
 from utils.list_to_tuple import list_to_tuple_string
 import smbclient
 import aspose.zip as az 
-
+import rarfile
 
 #Tarea para copiar archivos desde un recurso compartido
 @task()
@@ -29,16 +29,16 @@ def copy_file_from_share():
         archivo_nombre = settings.file_name
         ruta_remota = fr"\\{servidor}\{recurso}\{archivo_nombre}"
         ruta_local = os.path.join(settings.path_local, archivo_nombre)
-        logger.info("Termino configuración de SMB")
+        logger.info("Termino configuracion de SMB")
 
         # Registrar la sesión SMB (con usuario y contraseña)
-        logger.info("Abriendo sesión en el recurso compartido")
+        logger.info("Abriendo sesion en el recurso compartido")
         smbclient.register_session(
         servidor,
         username=settings.share_username,
         password=settings.share_password,
         )
-        logger.info("Sesión abierta correctamente")
+        logger.info("Sesion abierta correctamente")
         # Copiar archivo remoto al disco local
         
         with smbclient.open_file(ruta_remota, mode='rb') as archivo_remoto:
@@ -50,22 +50,25 @@ def copy_file_from_share():
         logger.error(f"Error al copiar el archivo: {e}")
     return True
 
+
 @task(name="DESCOMPRIMIR-RAR")
 def descomprime_rar():
     logger = get_run_logger()
-    logger.info("Iniciando descompresión de archivo RAR")
+    logger.info("Iniciando descompresion de archivo RAR")
+    rarfile.UNRAR_TOOL = "UnRAR"
     try:
         ruta = settings.path_local
         if os.path.exists(ruta):
             # Ubicar el archivo a descomprimir 
-            with az.rar.RarArchive(f"{settings.path_local}/DATA 24.04.25.rar") as archive:
-                # Extraiga la carpeta del rar
-                archive.extract_to_directory(settings.path_extract)
+             with rarfile.RarFile(f"{settings.path_local}/DATA.rar") as rf:
+                rf.extractall(path=settings.path_extract)
+                logger.info("Archivo descomprimido correctamente.")
         else:
-            logger.error("No se encontró la ruta especificada.")
+            logger.error("No se encontro la ruta especificada.")
     except Exception as e:
         logger.error(f"Error al descomprimir el archivo: {e}")
     return True
+
 
 # Tarea para leer archivos DBF sin cache\@
 @task(retries=2, retry_delay_seconds=30)
