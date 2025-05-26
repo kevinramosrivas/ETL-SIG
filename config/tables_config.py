@@ -228,7 +228,7 @@ TABLES_QUERY = queries = [
     select
         id_clasificador as id_generica,
         cod_clasif as cod_generica,
-        desc_clasif as nomb_generica
+        nomb_clasif as nomb_generica
     from bytsscom_bytcore.clasificador
     where id_nivel = 2;
     """
