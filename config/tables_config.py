@@ -180,8 +180,9 @@ TABLES_QUERY = queries = [
             area_name,
             cod_siaf_area,
             area_display_name,
-            case id_parent_area when 10468 then 0
-                else 1 end as is_central
+            2 as nivel,
+            case id_parent_area when 10468 then 10468
+                else 11327 end as idsuperior
         from bytsscom_bytcore.area
         where length(area_name) = 3 and cod_siaf_area not in ('0000', '0001')
         union
@@ -190,25 +191,36 @@ TABLES_QUERY = queries = [
             area_name,
             cod_siaf_area,
             area_display_name,
-            case id_parent_area when 10468 then 0
-                else 1 end as is_central
+            2 as nivel,
+            case id_parent_area when 10468 then 10468
+                else 11327 end as is_central
         from bytsscom_bytcore.area
         where id_parent_area = 10030 and length(area_name) = 5
         and id_area in (10383, 10390, 10395, 10385)
         union
         select
-            0 as id_area,
+            10000 as id_area,
             '000' as area_name,
             '0000' as cod_siaf_area,
             'UNMSM' as area_display_name,
-            2 as is_central
+               0 as nivel,
+               0 as idsuperior
         union
         select
             11327 as id_area,
             'D65' as area_name,
             '0001' as cod_siaf_area,
             'ADMINISTRACION CENTRAL' as area_display_name,
-            2 as is_central;
+            1 as nivel,
+            10000 as idsuperior
+        union
+        select
+            10468 as id_area,
+            'F' as area_name,
+            '1000' as cod_siaf_area,
+            'FACULTADES' as area_display_name,
+            1 as nivel,
+            10000 as idsuperior;
         """
     },
         {
@@ -254,7 +266,7 @@ TABLES_QUERY = queries = [
         cf.ano_eje as anio,
         certificado as num_certificado,
         coalesce(caa.cod_siaf_area, '0000') as cod_siaf_area,
-        fuente_financ as fuente_siaf,
+        TRIM(fuente_financ) as fuente_siaf,
         monto
     from bytsscom_bytsiaf.certificado_fase cf
     left join certificado_anio_area caa
@@ -358,6 +370,28 @@ TABLES_QUERY = queries = [
                 inner join bytsscom_bytsiaf.expediente_fase ef on cs.num_certificado = ef.certificado
                 and ef.ano_eje = cs.anio::varchar
     """
+        },
+        {
+            "table": "sistema_informacion_gerencial.hechos_pim",
+            "query": """
+                SELECT
+                    id_periodo_pla,
+                    f.id_fuente,
+                    f.siaf_codigo as fuente_siaf,
+                    p.id_area,
+                    cod_siaf_area,
+                    c.id_clasificador as id_generica,
+                    c.nomb_clasif as generica,
+                    monto_pia,
+                    monto_pim
+                    from bytsscom_bytpoa.vw_pim p
+                inner join bytsscom_bytcore.area a
+                    on p.id_area = a.id_area
+                inner join bytsscom_bytcore.clasificador c
+                on c.id_clasificador = p.id_clasificador
+                inner join bytsscom_bytcore.fuente f
+                on f.id_fuente = p.id_fuente;    
+            """
         },
 ]
 
