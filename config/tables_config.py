@@ -128,7 +128,7 @@ TABLES_INFO = [
         "path": "certificado.dbf",
         "filter_fields": {
             "CERTIFICAD": None,
-            "ANO_EJE": ["2024", "2025"],
+            "ANO_EJE": ["2023","2024", "2025"],
             "ESTADO_REG": ["A"],
             "TIPO_CERTI": ["2"],
         },
@@ -139,7 +139,7 @@ TABLES_INFO = [
         "path": "certificado_fase.dbf",
         "filter_fields": {
             "CERTIFICAD": None,
-            "ANO_EJE": ["2024", "2025"],
+            "ANO_EJE": ["2023","2024", "2025"],
         },
     },
     {
@@ -148,7 +148,7 @@ TABLES_INFO = [
         "path": "certificado_secuencia.dbf",
         "filter_fields": {
             "CERTIFICAD": None,
-            "ANO_EJE": ["2024", "2025"],
+            "ANO_EJE": ["2023","2024", "2025"],
         },
     },
     {
@@ -157,7 +157,7 @@ TABLES_INFO = [
         "path": "certificado_meta.dbf",
         "filter_fields": {
             "CERTIFICAD": None,
-            "ANO_EJE": ["2024", "2025"],
+            "ANO_EJE": ["2023","2024", "2025"],
         },
     },
     {
@@ -289,76 +289,90 @@ TABLES_QUERY = queries = [
         {
             "table": "sistema_informacion_gerencial.dm_certificado",
             "query": """
-    with certificado_anio_area as (
-        select distinct
-            c.siaf_certificado,
-            cert.ano_eje,
-            a.cod_siaf_area
-        from bytsscom_bytsig.vw_certificacion c
-        inner join bytsscom_bytsig.memo_requerimiento m
-            on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
-        inner join bytsscom_bytsiaf.certificado cert
-            on c.id_anio::varchar = cert.ano_eje and c.siaf_certificado = cert.certificado
-        inner join bytsscom_bytcore.area a
-            on a.id_area = m.id_area
-        where c.esta_cert = 'A' and tipo_cert = 'DP'
-    )
-    select
-        cert.ano_eje as ano_eje,
-        cert.certificado as num_certificado,
-        cf.secuencia,
-        cf.glosa,
-        f.siaf_codigo as siaf_id_fuente,
-        f.abre_fuente as fuente,
-        cs.cod_doc,
-        cs.num_doc,
-        cs.estado_envio,
-        cs.estado_registro,
-        cs.fecha_creacion_clt,
-        cla.codigo_siaf as siaf_id_clasificador,
-        cla.cod_clasif as clasificador,
-        substr(cla.cod_clasif, 0, 3) as generica,
-        mis.id_meta_institucional as idmeta,
-        mis.sec_func as codmeta,
-        mp.nomb_met_ins,
-        coalesce(areas.cod_siaf_area, '0000') as cod_siaf_area,
-        sum(cs.monto_nacional) as monto_nacional,
-        sum(cm.monto_nacional) as monto_clasificador
-    from bytsscom_bytsiaf.certificado cert
-    inner join bytsscom_bytsiaf.certificado_fase cf
-        on cert.certificado = cf.certificado and cert.ano_eje = cf.ano_eje
-    inner join bytsscom_bytcore.fuente f
-        on cf.fuente_financ = f.siaf_codigo
-    inner join bytsscom_bytsiaf.certificado_secuencia cs
-        on cert.certificado = cs.certificado and cert.ano_eje = cs.ano_eje and cf.secuencia = cs.secuencia and cs.estado_registro = 'A'
-    inner join bytsscom_bytsiaf.certificado_meta cm
-        on cf.certificado = cm.certificado and cf.ano_eje = cm.ano_eje and cf.secuencia = cm.secuencia
-    inner join bytsscom_bytcore.clasificador cla
-        on cla.codigo_siaf = cm.id_clasificador
-    left join bytsscom_bytcore.meta_institucional_siaf mis
-        on cm.sec_func = mis.sec_func and cm.ano_eje = mis.id_anio::varchar
-    inner join bytsscom_bytcore.meta_institucional mp
-        on mis.id_meta_institucional = mp.id_meta_institucional
-    left join certificado_anio_area areas
-        on cf.certificado = areas.siaf_certificado and areas.ano_eje = cf.ano_eje
-    group by cert.ano_eje,
+        with certificado_anio_area as (
+                select distinct
+                    c.siaf_certificado,
+                    cert.ano_eje,
+                    a.cod_siaf_area
+                from bytsscom_bytsig.vw_certificacion c
+                inner join bytsscom_bytsig.memo_requerimiento m
+                    on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
+                inner join bytsscom_bytsiaf.certificado cert
+                    on c.id_anio::varchar = cert.ano_eje and c.siaf_certificado = cert.certificado
+                inner join bytsscom_bytcore.area a
+                    on a.id_area = m.id_area
+                where c.esta_cert = 'A' and tipo_cert = 'DP'
+            ),
+        certificado_consolidado as (
+            select
+                ano_eje,
+                sec_ejec,
+                certificado,
+                secuencia,
+                correlativo,
+                cod_doc,
+                num_doc,
+                estado_envio,
+                estado_registro,
+                fecha_creacion_clt,
+                sum(monto_nacional) as monto_detalle
+                from
+            bytsscom_bytsiaf.certificado_secuencia
+            where cod_doc in ('086','000')
+            group by ano_eje, sec_ejec, certificado,secuencia,correlativo
+            ),
+        fuentes as(
+            select
+                id_fuente,
+                siaf_codigo,
+                upper(desc_fuente) as desc_fuente
+            from bytsscom_bytcore.fuente
+                where esta_fuente = '1' and id_fuente < 6
+        )
+        SELECT
+            cc.ano_eje,
+            cc.certificado as num_certificado,
+            coalesce(caa.cod_siaf_area, '0000') as cod_siaf_area,
+            cc.secuencia,
+            cc.sec_ejec,
+            cm.monto_nacional as monto_clasificador,
+            f.siaf_codigo as siaf_id_fuente,
             cf.glosa,
-            cert.certificado,
-            cf.secuencia,
-            f.siaf_codigo,
-            f.abre_fuente,
-            cs.cod_doc,
-            cs.num_doc,
-            cla.codigo_siaf,
-            cla.cod_clasif,
-            substr(cla.cod_clasif, 0, 3),
-            mis.id_meta_institucional,
-            mis.sec_func,
-            mp.nomb_met_ins,
-            areas.cod_siaf_area,
-            cs.estado_envio,
-            cs.estado_registro,
-            cs.fecha_creacion_clt;
+            cc.correlativo,
+            cm.id_clasificador as siaf_id_clasificador,
+            cla.cod_clasif AS clasificador,
+            SUBSTRING(cla.cod_clasif, 1, 2) AS generica,
+            cc.cod_doc,
+            cc.num_doc,
+            cc.estado_envio,
+            cc.estado_registro,
+            fecha_creacion_clt,
+            mis.id_meta_institucional as idmeta,
+            mis.sec_func as codmeta,
+            mp.nomb_met_ins
+            from
+        certificado_consolidado cc
+        left join certificado_anio_area caa
+            on cc.certificado = caa.siaf_certificado
+            and cc.ano_eje = caa.ano_eje
+        inner join bytsscom_bytsiaf.certificado_fase cf
+            on cc.certificado = cf.certificado
+            and cc.ano_eje = cf.ano_eje
+            and cc.secuencia = cf.secuencia
+        inner join fuentes f
+                on TRIM(cf.fuente_financ) = f.siaf_codigo
+        inner join bytsscom_bytsiaf.certificado_meta cm
+                on cc.certificado = cm.certificado
+                and cc.ano_eje = cm.ano_eje
+                and cc.secuencia = cm.secuencia
+                and cc.correlativo = cm.correlativo
+        inner join bytsscom_bytcore.clasificador cla
+                on cla.codigo_siaf = cm.id_clasificador
+                and cla.activo_clasif = 1
+        left join bytsscom_bytcore.meta_institucional_siaf mis
+                on cm.sec_func = mis.sec_func and cm.ano_eje = mis.id_anio::varchar
+            inner join bytsscom_bytcore.meta_institucional mp
+                on mis.id_meta_institucional = mp.id_meta_institucional
     """
         },
           {
