@@ -52,6 +52,19 @@ BASE_COLUMNS = {
         "TIPO_FINANCIAMIENTO", "COD_DOC_REF", "FECHA_DOC_REF", "NUM_DOC_REF",
         "CERTIFICADO", "CERTIFICADO_SECUENCIA", "SEC_EJEC_RUC",
     ],
+    "expediente_secuencia": [
+        "ANO_EJE", "SEC_EJEC", "EXPEDIENTE", "CICLO", "FASE", "SECUENCIA",
+        "CORRELATIVO","COD_DOC","NUM_DOC","FECHA_DOC","MONEDA","TIPO_CAMBIO",
+        "MONTO","MONTO_SALDO","MONTO_NACIONAL","MONTO_EXTRANJERO","FECHA_ING",
+        "USUARIO_ING","FECHA_MOD","USUARIO_MOD","NUM_RECORD","SERIE_DOC","ANO_PROCESO",
+        "MES_PROCESO","DIA_PROCESO","GRUPO","EDICION","ANO_CTA_CTE","BANCO","CTA_CTE",
+        "FECHA_AUTORIZACION","COD_MENSA","ESTADO_CTB","ESTADO_CTB_ANTERIOR","ESTADO",
+        "ESTADO_ANTERIOR","ESTADO_ENVIO","ARCHIVO","REG_MULTIPLE","CTA_BCO_EJEC","FLG_INTERFASE",
+        "IND_CONTABILIZA","TIPO_CAMBIO_PS","SEC_PROCESO","COD_DOC_B","FECHA_DOC_B", "NUM_DOC_B",
+        "FECHA_BD_ORACLE","MES_AFECTACION_CALENDARIO","SECUENCIA_SOLICITUD","FECHA_CREACION_CLT",
+        "FECHA_MODIFICACION_CLT","USUARIO_CREACION_CLT","USUARIO_MODIFICACION_CLT","FECHA_AUTORIZACION_GIRO",
+        "VERIFICA_1"
+    ],
 }
 
 # Diccionario maestro de mapeos de campo por clave
@@ -117,6 +130,34 @@ BASE_FIELD_MAP = {
         "CERTIFICADO_SECUENCIA": "CERTIFICA2",
         "SEC_EJEC_RUC": "SEC_EJEC_R",
     },
+    "expediente_secuencia": {
+        "CORRELATIVO": "CORRELATIV",
+        "TIPO_CAMBIO": "TIPO_CAMBI",
+        "MONTO_SALDO": "MONTO_SALD",
+        "MONTO_NACIONAL": "MONTO_NACI",
+        "MONTO_EXTRANJERO": "MONTO_EXTR",
+        "USUARIO_ING": "USUARIO_IN",
+        "USUARIO_MOD": "USUARIO_MO",
+        "ANO_CTA_CTE": "ANO_CTA_CT",
+        "FECHA_AUTORIZACION": "FECHA_AUTO",
+        "ESTADO_CTB_ANTERIOR": "ESTADO_CT2",
+        "ESTADO_ANTERIOR": "ESTADO_ANT",
+        "REG_MULTIPLE": "REG_MULTIP",
+        "CTA_BCO_EJEC": "CTA_BCO_EJ",
+        "FLG_INTERFASE": "FLG_INTERF",
+        "IND_CONTABILIZA": "IND_CONTAB",
+        "TIPO_CAMBIO_PS": "TIPO_CAMB2",
+        "FECHA_DOC_B": "FECHA_DOC_",
+        "NUM_DOC_B": "NUM_DOC_B",
+        "FECHA_BD_ORACLE": "FECHA_BD_O",
+        "MES_AFECTACION_CALENDARIO": "MES_AFECTA",
+        "SECUENCIA_SOLICITUD": "SECUENCIA_",
+        "FECHA_CREACION_CLT": "FECHA_CREA",
+        "FECHA_MODIFICACION_CLT": "FECHA_MODI",
+        "USUARIO_CREACION_CLT": "USUARIO_CR",
+        "USUARIO_MODIFICACION_CLT": "USUARIO_M2",
+        "FECHA_AUTORIZACION_GIRO": "FECHA_AUT2"
+    }
 }
 
 # Lista mínima de metadatos para generar configs de Prefect
@@ -166,6 +207,14 @@ TABLES_INFO = [
         "filter_fields": {
             "CERTIFICAD": None,
             "ANO_EJE": ["2024", "2025"],
+        },
+    },
+    {
+        "key": "expediente_secuencia",
+        "table": "bytsscom_bytsiaf.expediente_secuencia",
+        "path": "expediente_secuencia.dbf",
+        "filter_fields": {
+            "ANO_EJE": ["2022"]
         },
     },
 ]

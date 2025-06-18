@@ -2,6 +2,7 @@ import io
 import os
 import csv
 import shutil
+import tempfile
 import time
 from io import StringIO
 from typing import Any, Callable, Dict, Iterable, List, Optional
@@ -14,7 +15,7 @@ from config.settings_config import settings
 from config.database_config import DatabaseConnection
 from utils.list_to_tuple import list_to_tuple_string
 import smbclient
-import aspose.zip as az 
+#import aspose.zip as az 
 import rarfile
 
 #Tarea para copiar archivos desde un recurso compartido
@@ -81,7 +82,7 @@ def read_dbf(path: str) -> Iterable[Dict[str, Any]]:
         raise FileNotFoundError(f"DBF no encontrado: {full_path}")
     logger.info(f"Leyendo DBF desde ruta: {full_path}")
     records = DBF(full_path, record_factory=dict, encoding="cp1252", char_decode_errors="replace")
-    logger.info(f"Lectura completada: {len(list(records))} registros cargados (evaluación previa).")
+    #logger.info(f"Lectura completada: {len(list(records))} registros cargados (evaluación previa).")
     return records
 
 
@@ -89,14 +90,14 @@ def read_dbf(path: str) -> Iterable[Dict[str, Any]]:
 @task(retries=3, retry_delay_seconds=30, name="CONEXION_BD", cache_policy=NO_CACHE)
 def connect_db() -> DatabaseConnection:
     logger = get_run_logger()
-    logger.info("Creando conexión a la base de datos...")
+    logger.info("Creando conexion a la base de datos...")
     db = DatabaseConnection()
-    logger.info("Conexión a la base de datos establecida correctamente.")
+    logger.info("Conexion a la base de datos establecida correctamente.")
     return db
 
 
 # Tarea para carga masiva de datos\@
-@task(retries=1, retry_delay_seconds=10)
+@task(retries=1, retry_delay_seconds=10, log_prints=False)
 def bulk_load(
     table: str,
     columns: List[str],
@@ -106,41 +107,68 @@ def bulk_load(
     truncate: bool = False,
 ) -> bool:
     logger = get_run_logger()
-    logger.info(f"Iniciando bulk_load en tabla {table}. Truncate={truncate}.")
+    logger.info(f"Iniciando bulk_load en tabla '{table}'. Truncate={truncate}.")
     start_time = time.time()
 
-    db = connect_db()
+    # 1. Conectar
+    db = DatabaseConnection()
     cursor = db.connect()
 
+    # 2. Truncate si corresponde
     if truncate:
-        logger.info(f"Truncando tabla {table} y deshabilitando triggers...")
         cursor.execute(f"TRUNCATE {table} RESTART IDENTITY CASCADE;")
         cursor.execute(f"ALTER TABLE {table} DISABLE TRIGGER ALL;")
+        logger.info(f"Tabla '{table}' truncada y triggers deshabilitados.")
 
-    buf = StringIO()
-    writer = csv.writer(buf, lineterminator="\n")
-    writer.writerow(columns)
-
+    # 3. Crear CSV en archivo temporal
     count = 0
-    for rec in records:
-        if filter_fn and not filter_fn(rec):
-            continue
-        row = [rec.get(field_map.get(col, col)) for col in columns]
-        writer.writerow(row)
-        count += 1
-    buf.seek(0)
+    with tempfile.NamedTemporaryFile(
+        mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
+    ) as tmp:
+        writer = csv.writer(tmp, lineterminator="\n")
+        # Escribir cabecera
+        writer.writerow(columns)
+        # Escribir filas
+        for rec in records:
+            if filter_fn and not filter_fn(rec):
+                continue
+            # Mapear campos y convertir None/"" a \N para COPY
+            row = []
+            for col in columns:
+                val = rec.get(field_map.get(col, col)) if field_map else rec.get(col)
+                if val in (None, "", "None"):
+                    row.append(r'\N')
+                else:
+                    # val ya viene decodificado CP1252 en read_dbf
+                    row.append(val)
+                count += 1
+            writer.writerow(row)
 
-    cols_sql = ", ".join(columns)
-    logger.info(f"Copiando {count} registros a {table} usando COPY...")
-    cursor.copy_expert(f"COPY {table} ({cols_sql}) FROM STDIN WITH (FORMAT csv, HEADER TRUE)", buf)
+        tmp_path = tmp.name
 
+    logger.info(f"{count} registros escritos en temporal: {tmp_path}")
+
+    # 4. Ejecutar COPY desde el archivo temporal
+    with open(tmp_path, "r", encoding="utf-8") as f:
+        cols_sql = ", ".join(columns)
+        copy_sql = (
+            f"COPY {table} ({cols_sql}) "
+            "FROM STDIN WITH (FORMAT csv, HEADER TRUE, NULL '\\N');"
+        )
+        cursor.copy_expert(copy_sql, f)
+        logger.info(f"COPY ejecutado en tabla '{table}'.")
+
+    # 5. Rehabilitar triggers si truncamos
     if truncate:
-        logger.info(f"Rehabilitando triggers en tabla {table}...")
         cursor.execute(f"ALTER TABLE {table} ENABLE TRIGGER ALL;")
+        logger.info(f"Triggers reactivados en tabla '{table}'.")
 
+    # 6. Limpiar y medir tiempo
+    os.remove(tmp_path)
     elapsed = round(time.time() - start_time, 2)
-    logger.info(f"Bulk_load completado: {count} registros cargados en {table} en {elapsed} segundos.")
+    logger.info(f"bulk_load completado: {count} registros en {elapsed}s.")
     return True
+
 
 
 # Tarea para ejecutar consultas\@
