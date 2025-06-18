@@ -14,9 +14,9 @@ from prefect.cache_policies import NO_CACHE
 from config.settings_config import settings
 from config.database_config import DatabaseConnection
 from utils.list_to_tuple import list_to_tuple_string
-import smbclient
-#import aspose.zip as az 
-import rarfile
+# import smbclient
+# #import aspose.zip as az 
+# import rarfile
 
 #Tarea para copiar archivos desde un recurso compartido
 @task()

@@ -2,8 +2,4 @@
 DATA
 __pycache__
 .vscode
-Include
-library
-Scripts
-pyvenv.cfg
-Lib
+venv
