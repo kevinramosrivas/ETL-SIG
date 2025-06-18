@@ -117,6 +117,7 @@ BASE_FIELD_MAP = {
         "CERTIFICADO_SECUENCIA": "CERTIFICA2",
         "SEC_EJEC_RUC": "SEC_EJEC_R",
     },
+    
 }
 
 # Lista mínima de metadatos para generar configs de Prefect
@@ -165,7 +166,7 @@ TABLES_INFO = [
         "path": "expediente_fase.dbf",
         "filter_fields": {
             "CERTIFICAD": None,
-            "ANO_EJE": ["2024", "2025"],
+            "ANO_EJE": ["2023","2024", "2025"],
         },
     },
 ]
@@ -204,7 +205,7 @@ TABLES_QUERY = queries = [
             '0000' as cod_siaf_area,
             'UNMSM' as area_display_name,
                0 as nivel,
-               0 as idsuperior
+               null as idsuperior
         union
         select
             11327 as id_area,
@@ -248,31 +249,41 @@ TABLES_QUERY = queries = [
         {
             "table": "sistema_informacion_gerencial.hechos_institucional_consolidados",
             "query": """
-    with certificado_anio_area as (
-        select distinct
-            c.siaf_certificado,
-            cert.ano_eje,
-            a.cod_siaf_area
-        from bytsscom_bytsig.vw_certificacion c
-        inner join bytsscom_bytsig.memo_requerimiento m
-            on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
-        inner join bytsscom_bytsiaf.certificado cert
-            on c.id_anio::varchar = cert.ano_eje and c.siaf_certificado = cert.certificado
-        inner join bytsscom_bytcore.area a
-            on a.id_area = m.id_area
-        where c.esta_cert = 'A' and tipo_cert = 'DP'
-    )
-    select
-        cf.ano_eje as anio,
-        certificado as num_certificado,
-        coalesce(caa.cod_siaf_area, '0000') as cod_siaf_area,
-        TRIM(fuente_financ) as fuente_siaf,
-        monto
-    from bytsscom_bytsiaf.certificado_fase cf
-    left join certificado_anio_area caa
-        on caa.siaf_certificado = cf.certificado and caa.ano_eje = cf.ano_eje
-    where es_compromiso = 'N' and estado_registro = 'A' and secuencia = '0001'
-    group by cf.ano_eje, certificado, monto, fuente_financ, caa.cod_siaf_area;
+            with certificado_anio_area as (
+                select distinct
+                    c.siaf_certificado,
+                    cert.ano_eje,
+                    a.cod_siaf_area
+                from bytsscom_bytsig.vw_certificacion c
+                inner join bytsscom_bytsig.memo_requerimiento m
+                    on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
+                inner join bytsscom_bytsiaf.certificado cert
+                    on c.id_anio::varchar = cert.ano_eje and c.siaf_certificado = cert.certificado
+                inner join bytsscom_bytcore.area a
+                    on a.id_area = m.id_area
+                where c.esta_cert = 'A' and tipo_cert = 'DP'
+            ),
+        certificado_consolidado as (
+            select
+                ano_eje,
+                sec_ejec,
+                certificado,
+                sum(monto_nacional) as monto_detalle
+                from
+            bytsscom_bytsiaf.certificado_secuencia
+            where cod_doc in ('086','000')
+            group by ano_eje, sec_ejec, certificado
+            )
+        SELECT
+            cc.ano_eje as anio,
+            cc.certificado as num_certificado,
+            coalesce(caa.cod_siaf_area, '0000') as cod_siaf_area,
+            cc.monto_detalle as monto
+            from
+        certificado_consolidado cc
+        left join certificado_anio_area caa
+            on cc.certificado = caa.siaf_certificado
+            and cc.ano_eje = caa.ano_eje
     """
         },
         {
@@ -365,7 +376,8 @@ TABLES_QUERY = queries = [
                 ef.monto_nacional,
                 ef.monto_saldo,
                 ef.cod_doc_ref as cod_doc,
-                ef.num_doc_ref as num_doc
+                ef.num_doc_ref as num_doc,
+                ef.fuente_financ as fuente_siaf
                 from sistema_informacion_gerencial.hechos_institucional_consolidados cs
                 inner join bytsscom_bytsiaf.expediente_fase ef on cs.num_certificado = ef.certificado
                 and ef.ano_eje = cs.anio::varchar
