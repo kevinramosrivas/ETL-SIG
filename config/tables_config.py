@@ -278,10 +278,9 @@ TABLES_QUERY = queries = [
             "query": """
     select
         siaf_codigo as fuente_siaf,
-        desc_fuente
+        upper(desc_fuente) as desc_fuente
     from bytsscom_bytcore.fuente
-    where id_fuente < 4
-    order by siaf_codigo;
+          where esta_fuente = '1' and id_fuente < 6
     """
         },
         {
