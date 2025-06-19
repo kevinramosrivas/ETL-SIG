@@ -427,23 +427,70 @@ TABLES_QUERY = queries = [
           {
             "table": "sistema_informacion_gerencial.dm_expediente",
             "query": """
-            select
-                cs.anio as  ano_eje,
-                ef.sec_ejec,
-                ef.certificado,
-                ef.expediente,
-                ef.ciclo,
-                ef.fase,
-                ef.secuencia,
-                ef.certificado_secuencia,
-                ef.monto_nacional,
-                ef.monto_saldo,
-                ef.cod_doc_ref as cod_doc,
-                ef.num_doc_ref as num_doc,
-                ef.fuente_financ as fuente_siaf
-                from sistema_informacion_gerencial.hechos_institucional_consolidados cs
-                inner join bytsscom_bytsiaf.expediente_fase ef on cs.num_certificado = ef.certificado
-                and ef.ano_eje = cs.anio::varchar
+    with expediente_generica as (
+            SELECT distinct
+                    c.cod_clasif AS cod_clasif,
+                    c.codigo_siaf
+            FROM bytsscom_bytcore.clasificador c
+            ),
+    expediente_consolidado as (
+        SELECT
+            es.ano_eje,
+            es.expediente,
+            es.sec_ejec,
+            secuencia,
+            correlativo,
+            ciclo,
+            coalesce(e.sec_area,'0000') as sec_area,
+            fase,
+            es.cod_doc,
+            es.num_doc,
+            es.estado_envio,
+            es.fecha_autorizacion,
+            sum(monto_nacional) AS monto_nacional
+            FROM bytsscom_bytsiaf.expediente_secuencia es
+            left JOIN bytsscom_bytsiaf.expediente e
+                ON es.ano_eje = e.ano_eje
+                AND es.expediente = e.expediente
+            WHERE ciclo = 'G' and fase = 'D' and (estado_ctb = 'S' or estado_ctb is null )
+            group by es.ano_eje,e.sec_area,es.sec_ejec,secuencia,correlativo,
+            es.expediente,
+            ciclo,
+            fase
+        )
+        select
+            ec.ano_eje as ano_eje,
+            ec.sec_ejec,
+            ec.sec_area as area_siaf,
+            ec.expediente ,
+            ec.fase,
+            ec.secuencia,
+            ec.correlativo,
+            ec.ciclo,
+            ef.certificado,
+            ef.certificado_secuencia,
+            ec.fecha_autorizacion,
+            ef.fuente_financ as fuente_siaf,
+            cla.cod_clasif AS clasificador,
+            SUBSTRING(cla.cod_clasif, 1, 2) AS generica,
+            em.monto_nacional,
+            ec.cod_doc,
+            ec.num_doc,
+            em.estado_envio,
+            em.id_clasificador as siaf_id_clasificador
+        from  expediente_consolidado ec
+        inner join bytsscom_bytsiaf.expediente_fase ef
+            on ec.ano_eje = ef.ano_eje
+            and ec.expediente = ef.expediente
+            and ec.secuencia = ef.secuencia
+        inner join bytsscom_bytsiaf.expediente_meta em
+            on ec.ano_eje = em.ano_eje
+            and ec.expediente = em.expediente
+            and ec.secuencia = em.secuencia
+            and ec.correlativo = em.correlativo
+            and em.ciclo = 'G' and em.fase = 'D'
+        left join expediente_generica cla
+                on cla.codigo_siaf = em.id_clasificador
     """
         },
         {
