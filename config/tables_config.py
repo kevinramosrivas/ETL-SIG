@@ -43,6 +43,15 @@ BASE_COLUMNS = {
         "ESTADO_ENVIO", "MONTO_NACIONAL_AJUSTE", "SYS_COD_CLASIF",
         "SYS_ID_CLASIFICADOR",
     ],
+    "expediente":[  
+    "ANO_EJE", "SEC_EJEC", "EXPEDIENTE", "MES_EJE", "COD_DOC", "NUM_DOC",
+    "FECHA_DOC", "FECHA_ING", "USUARIO_ING", "FECHA_MOD", "USUARIO_MOD",
+    "TIPO_OPERACION", "SEC_EJEC2", "MODALIDAD_COMPRA", "CLASE_MENOR_CUANTIA",
+    "SEC_AREA", "FLAG_ENCARGO", "EXPEDIENTE_ENCARGANTE", "COD_MENSA",
+    "ESTADO", "ESTADO_ENVIO", "ARCHIVO", "TIPO_PROCESO", "ID_PROCESO",
+    "ID_CONTRATO", "SEC_EJEC_CONTRATO", "FASE_CONTRACTUAL", "PROCEDENCIA",
+    "EXPEDIENTE_FINANCIAMIENTO"  
+    ],
     "expediente_fase": [
         "ANO_EJE", "SEC_EJEC", "EXPEDIENTE", "CICLO", "FASE", "SECUENCIA",
         "SECUENCIA_PADRE", "SECUENCIA_ANTERIOR", "MES_CTB", "MONTO_NACIONAL",
@@ -157,7 +166,24 @@ BASE_FIELD_MAP = {
         "USUARIO_CREACION_CLT": "USUARIO_CR",
         "USUARIO_MODIFICACION_CLT": "USUARIO_M2",
         "FECHA_AUTORIZACION_GIRO": "FECHA_AUT2"
+    },
+    "expediente": {
+        "USUARIO_ING": "USUARIO_IN",
+        "USUARIO_MOD": "USUARIO_MO",
+        "TIPO_OPERACION":"TIPO_OPERA",
+        "MODALIDAD_COMPRA":"MODALIDAD_",
+        "CLASE_MENOR_CUANTIA":"CLASE_MENO",
+        "FLAG_ENCARGO": "FLAG_ENCAR",
+        "EXPEDIENTE_ENCARGANTE":"EXPEDIENT2",
+        "ESTADO_ENVIO": "ESTADO_ENV",
+        "TIPO_PROCESO":"TIPO_PROCE",
+        "ID_CONTRATO": "ID_CONTRAT",
+        "SEC_EJEC_CONTRATO":"SEC_EJEC_C",
+        "FASE_CONTRACTUAL":"FASE_CONTR",
+        "PROCEDENCIA":"PROCEDENCI",
+        "EXPEDIENTE_FINANCIAMIENTO":"EXPEDIENT3",
     }
+   
     
 }
 
@@ -207,7 +233,7 @@ TABLES_INFO = [
         "path": "expediente_fase.dbf",
         "filter_fields": {
             "CERTIFICAD": None,
-            "ANO_EJE": ["2024", "2025"],
+            "ANO_EJE": ["2023","2024", "2025"],
         },
     },
     {
@@ -215,7 +241,15 @@ TABLES_INFO = [
         "table": "bytsscom_bytsiaf.expediente_secuencia",
         "path": "expediente_secuencia.dbf",
         "filter_fields": {
-            "ANO_EJE": ["2022"]
+            "ANO_EJE": ["2023","2024","2025"]
+        },
+    },
+     {
+        "key": "expediente",
+        "table": "bytsscom_bytsiaf.expediente",
+        "path": "expediente.dbf",
+        "filter_fields": {
+            "ANO_EJE": ["2023","2024","2025"],
         },
     },
 ]
