@@ -186,39 +186,81 @@ def execute_query(sql_query: str):
 
 
 # Tarea para transformar y cargar datos desde consulta a tabla destino\@
-@task(retries=3, retry_delay_seconds=20)
-def load_data_table(name_table_target: str, sql_query: str) -> None:
+@task(retries=3, retry_delay_seconds=20, log_prints=False)
+def load_data_table(
+    name_table_target: str,
+    sql_query: str,
+    field_map: Optional[Dict[str, str]] = None,
+    filter_fn: Optional[Callable[[Dict[str, Any]], bool]] = None,
+    truncate: bool = True
+) -> bool:
     logger = get_run_logger()
     logger.info(f"Iniciando transformación y carga en tabla destino: {name_table_target}")
-    try:
-        data, columns = execute_query.with_options(name=f"TRANSFORMA-{name_table_target}")(sql_query)
+    start_time = time.time()
 
-        db = connect_db()
-        cursor = db.connect()
-        logger.info(f"Preparando truncado y deshabilitación de triggers en {name_table_target}...")
+    # 1. Ejecutar query y obtener datos
+    data, columns = execute_query.with_options(name=f"TRANSFORMA-{name_table_target}")(sql_query)
+
+    # 2. Conectar
+    db = connect_db()
+    cursor = db.connect()
+
+    # 3. Truncate y deshabilitar triggers si corresponde
+    if truncate:
+        logger.info(f"Truncando y deshabilitando triggers en {name_table_target}")
         cursor.execute(f"TRUNCATE TABLE {name_table_target} RESTART IDENTITY CASCADE;")
         cursor.execute(f"ALTER TABLE {name_table_target} DISABLE TRIGGER ALL;")
 
-        buffer = io.StringIO()
+    # 4. Crear CSV en archivo temporal
+    count = 0
+    with tempfile.NamedTemporaryFile(
+        mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
+    ) as tmp:
+        writer = csv.writer(tmp, lineterminator="\n")
+        writer.writerow(columns)  # cabecera
+
         for row in data:
-            values = [item if isinstance(item, str) and item not in ('None', '') else ('\\N' if item is None or item == 'None' else str(item)) for item in row]
-            line = list_to_tuple_string(values)
-            buffer.write(line + "\n")
-        buffer.seek(0)
+            # opcional: interpretar row como dict si viene así, o lista por posición
+            record = dict(zip(columns, row)) if not isinstance(row, dict) else row
+            if filter_fn and not filter_fn(record):
+                continue
 
-        cols_formatted = ', '.join(columns)
-        logger.info(f"Ejecutando COPY para {name_table_target} con marcador NULL...")
-        cursor.copy_expert(f"""
-            COPY {name_table_target} ({cols_formatted})
-            FROM STDIN WITH (FORMAT csv, DELIMITER ',', NULL '\\N');
-        """, buffer)
+            # preparar valores con field_map y NULL marker '\N'
+            out_row = []
+            for col in columns:
+                key = field_map.get(col, col) if field_map else col
+                val = record.get(key)
+                if val in (None, "", "None"):
+                    out_row.append(r'\N')
+                else:
+                    out_row.append(val)
+            writer.writerow(out_row)
+            count += 1
 
+        tmp_path = tmp.name
+
+    logger.info(f"{count} registros escritos en temporal: {tmp_path}")
+
+    # 5. Ejecutar COPY desde el archivo temporal
+    with open(tmp_path, "r", encoding="utf-8") as f:
+        cols_sql = ", ".join(columns)
+        copy_sql = (
+            f"COPY {name_table_target} ({cols_sql}) "
+            "FROM STDIN WITH (FORMAT csv, HEADER TRUE, NULL '\\N');"
+        )
+        cursor.copy_expert(copy_sql, f)
+        logger.info(f"COPY ejecutado en tabla '{name_table_target}'.")
+
+    # 6. Reactivar triggers si truncamos
+    if truncate:
         cursor.execute(f"ALTER TABLE {name_table_target} ENABLE TRIGGER ALL;")
-        logger.info(f"Carga en tabla {name_table_target} completada exitosamente.")
-    except Exception as e:
-        logger.error(f"Error al cargar datos en {name_table_target}: {e}")
-        cursor.connection.rollback()
-        raise
+        logger.info(f"Triggers reactivados en tabla '{name_table_target}'.")
+
+    # 7. Limpiar y medir tiempo
+    os.remove(tmp_path)
+    elapsed = round(time.time() - start_time, 2)
+    logger.info(f"load_data_table completado: {count} registros en {elapsed}s.")
+    return True
 
 @flow(name="ETL-SIG:Extraccion")
 def extract() -> None:
@@ -256,7 +298,7 @@ def etl_sig() -> None:
     ruta_actual = os.getcwd()
     logger.info(f"La ruta actual es: {ruta_actual}")
     extract()
-    transform_load()
+    #transform_load()
     db =  connect_db()
     db.close()
 
