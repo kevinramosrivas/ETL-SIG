@@ -74,6 +74,12 @@ BASE_COLUMNS = {
         "FECHA_MODIFICACION_CLT","USUARIO_CREACION_CLT","USUARIO_MODIFICACION_CLT","FECHA_AUTORIZACION_GIRO",
         "VERIFICA_1"
     ],
+    "expediente_meta":[
+        "ANO_EJE","SEC_EJEC","EXPEDIENTE","CICLO","FASE","SECUENCIA","CORRELATIVO",
+        "CATEG_GASTO","GRUPO_GASTO","MODALIDAD_GASTO","ELEMENTO_GASTO","SEC_FUNC","MONTO",
+        "MONTO_SALDO","MONTO_NACIONAL","IND_PROCESO","EDICION","ESTADO","ESTADO_ENVIO","ARCHIVO",
+        "ID_CLASIFICADOR","SYS_COD_CLASIF","SYS_ID_CLASIFICADOR"
+    ],
 }
 
 # Diccionario maestro de mapeos de campo por clave
@@ -182,7 +188,20 @@ BASE_FIELD_MAP = {
         "FASE_CONTRACTUAL":"FASE_CONTR",
         "PROCEDENCIA":"PROCEDENCI",
         "EXPEDIENTE_FINANCIAMIENTO":"EXPEDIENT3",
+    },
+    "expediente_meta":{
+        "CORRELATIVO":"CORRELATIV",
+        "CATEG_GASTO":"CATEG_GAST",
+        "GRUPO_GASTO":"GRUPO_GAST",
+        "MODALIDAD_GASTO":"MODALIDAD_",
+        "ELEMENTO_GASTO":"ELEMENTO_G",
+        "MONTO_SALDO":"MONTO_SALD",
+        "IND_PROCESO":"IND_PROCES",
+        "MONTO_NACIONAL":"MONTO_NACI",
+        "ID_CLASIFICADOR":"ID_CLASIFI",
+        "ESTADO_ENVIO":"ESTADO_ENV",
     }
+    
    
     
 }
@@ -252,6 +271,15 @@ TABLES_INFO = [
             "ANO_EJE": ["2023","2024","2025"],
         },
     },
+    {
+        "key": "expediente_meta",
+        "table": "bytsscom_bytsiaf.expediente_meta",
+        "path": "expediente_meta.dbf",
+        "filter_fields": {
+            "ANO_EJE": ["2023","2024","2025"],
+        },
+
+    }
 ]
 
 
