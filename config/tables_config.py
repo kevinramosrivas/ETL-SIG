@@ -532,7 +532,6 @@ TABLES_QUERY = queries = [
             ef.certificado,
             ef.certificado_secuencia,
             ec.fecha_autorizacion,
-            ec.anio_modificacion,
             ef.fuente_financ as fuente_siaf,
             cla.cod_clasif AS clasificador,
             SUBSTRING(cla.cod_clasif, 1, 2) AS generica,
