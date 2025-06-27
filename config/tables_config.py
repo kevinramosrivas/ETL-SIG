@@ -508,12 +508,13 @@ TABLES_QUERY = queries = [
             es.num_doc,
             es.estado_envio,
             es.fecha_autorizacion,
+            coalesce(extract(year from es.fecha_mod),es.ano_eje::double precision) as anio_modificacion,
             sum(monto_nacional) AS monto_nacional
             FROM bytsscom_bytsiaf.expediente_secuencia es
             left JOIN bytsscom_bytsiaf.expediente e
                 ON es.ano_eje = e.ano_eje
                 AND es.expediente = e.expediente
-            WHERE ciclo = 'G' and fase = 'D' and (estado_ctb = 'S' or estado_ctb is null )
+            WHERE ciclo = 'G' and fase = 'D'
             group by es.ano_eje,e.sec_area,es.sec_ejec,secuencia,correlativo,
             es.expediente,
             ciclo,
@@ -531,6 +532,7 @@ TABLES_QUERY = queries = [
             ef.certificado,
             ef.certificado_secuencia,
             ec.fecha_autorizacion,
+            ec.anio_modificacion,
             ef.fuente_financ as fuente_siaf,
             cla.cod_clasif AS clasificador,
             SUBSTRING(cla.cod_clasif, 1, 2) AS generica,
@@ -544,6 +546,7 @@ TABLES_QUERY = queries = [
             on ec.ano_eje = ef.ano_eje
             and ec.expediente = ef.expediente
             and ec.secuencia = ef.secuencia
+            and ef.fuente_financ != '88'
         inner join bytsscom_bytsiaf.expediente_meta em
             on ec.ano_eje = em.ano_eje
             and ec.expediente = em.expediente
@@ -552,6 +555,7 @@ TABLES_QUERY = queries = [
             and em.ciclo = 'G' and em.fase = 'D'
         left join expediente_generica cla
                 on cla.codigo_siaf = em.id_clasificador
+    where certificado is not null AND ec.ano_eje::double precision = ec.anio_modificacion ;
     """
         },
         {
