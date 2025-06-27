@@ -195,7 +195,7 @@ def load_data_table(
     truncate: bool = True
 ) -> bool:
     logger = get_run_logger()
-    logger.info(f"Iniciando transformación y carga en tabla destino: {name_table_target}")
+    logger.info(f"Iniciando transformacion y carga en tabla destino: {name_table_target}")
     start_time = time.time()
 
     data, columns = execute_query.with_options(name=f"TRANSFORMA-{name_table_target}")(sql_query)
@@ -278,7 +278,7 @@ def etl_sig() -> None:
     logger = get_run_logger()
     logger.info(f"La ruta actual es: {os.getcwd()}")
     extract()
-    # transform_load()
+    transform_load()
     logger.info("ETL finalizado.")
 
 
