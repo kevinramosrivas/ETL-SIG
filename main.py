@@ -6,72 +6,95 @@ import tempfile
 import time
 from io import StringIO
 from typing import Any, Callable, Dict, Iterable, List, Optional
+from contextlib import contextmanager
+
 from utils.load_tables_config import load_table_configs, load_query_tables
 from utils.filter import build_filter
 from dbfread2 import DBF
 from prefect import flow, task, get_run_logger
 from prefect.cache_policies import NO_CACHE
 from config.settings_config import settings
-from config.database_config import DatabaseConnection
-from utils.list_to_tuple import list_to_tuple_string
+
+import psycopg2
+import psycopg2.extras
 # import smbclient
-# #import aspose.zip as az 
 # import rarfile
 
-#Tarea para copiar archivos desde un recurso compartido
+
+# ----------------------------
+# Context manager de conexión
+# ----------------------------
+@contextmanager
+def db_cursor(autocommit: bool = True):
+    conn = psycopg2.connect(
+        dbname=settings.db_name,
+        user=settings.db_user,
+        password=settings.db_password,
+        host=settings.db_host,
+        port=settings.db_port,
+    )
+    try:
+        conn.autocommit = autocommit
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        yield cursor
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# --------------------------------
+# Tarea para copiar archivos SMB
+# --------------------------------
 @task()
 def copy_file_from_share():
     logger = get_run_logger()
     logger.info("Iniciando copia de archivo desde recurso compartido")
     try:
-        logger.info("Inicializando configuración de SMB")
         servidor = fr"{settings.quipushare}"
         recurso = settings.recurso
         archivo_nombre = settings.file_name
         ruta_remota = fr"\\{servidor}\{recurso}\{archivo_nombre}"
         ruta_local = os.path.join(settings.path_local, archivo_nombre)
-        logger.info("Termino configuracion de SMB")
 
-        # Registrar la sesión SMB (con usuario y contraseña)
-        logger.info("Abriendo sesion en el recurso compartido")
         smbclient.register_session(
-        servidor,
-        username=settings.share_username,
-        password=settings.share_password,
+            servidor,
+            username=settings.share_username,
+            password=settings.share_password,
         )
-        logger.info("Sesion abierta correctamente")
-        # Copiar archivo remoto al disco local
-        
         with smbclient.open_file(ruta_remota, mode='rb') as archivo_remoto:
             with open(ruta_local, mode='wb') as archivo_local:
                 shutil.copyfileobj(archivo_remoto, archivo_local)
-        
+
         logger.info(f"Archivo copiado a: {ruta_local}")
     except Exception as e:
         logger.error(f"Error al copiar el archivo: {e}")
     return True
 
 
+# ----------------------------
+# Tarea para descomprimir RAR
+# ----------------------------
 @task(name="DESCOMPRIMIR-RAR")
 def descomprime_rar():
     logger = get_run_logger()
-    logger.info("Iniciando descompresion de archivo RAR")
+    logger.info("Iniciando descompresión de archivo RAR")
     rarfile.UNRAR_TOOL = "UnRAR"
     try:
         ruta = settings.path_local
         if os.path.exists(ruta):
-            # Ubicar el archivo a descomprimir 
-             with rarfile.RarFile(f"{settings.path_local}/DATA.rar") as rf:
+            with rarfile.RarFile(os.path.join(ruta, "DATA.rar")) as rf:
                 rf.extractall(path=settings.path_extract)
                 logger.info("Archivo descomprimido correctamente.")
         else:
-            logger.error("No se encontro la ruta especificada.")
+            logger.error("No se encontró la ruta especificada.")
     except Exception as e:
         logger.error(f"Error al descomprimir el archivo: {e}")
     return True
 
 
-# Tarea para leer archivos DBF sin cache\@
+# -------------------------------
+# Tarea para leer archivos DBF
+# -------------------------------
 @task(retries=2, retry_delay_seconds=30)
 def read_dbf(path: str) -> Iterable[Dict[str, Any]]:
     logger = get_run_logger()
@@ -80,23 +103,13 @@ def read_dbf(path: str) -> Iterable[Dict[str, Any]]:
     if not os.path.exists(full_path):
         logger.error(f"Archivo DBF no encontrado: {full_path}")
         raise FileNotFoundError(f"DBF no encontrado: {full_path}")
-    logger.info(f"Leyendo DBF desde ruta: {full_path}")
     records = DBF(full_path, record_factory=dict, encoding="cp1252", char_decode_errors="replace")
-    #logger.info(f"Lectura completada: {len(list(records))} registros cargados (evaluación previa).")
     return records
 
 
-# Tarea para crear conexión a BD sin cache\@
-@task(retries=3, retry_delay_seconds=30, name="CONEXION_BD", cache_policy=NO_CACHE)
-def connect_db() -> DatabaseConnection:
-    logger = get_run_logger()
-    logger.info("Creando conexion a la base de datos...")
-    db = DatabaseConnection()
-    logger.info("Conexion a la base de datos establecida correctamente.")
-    return db
-
-
-# Tarea para carga masiva de datos\@
+# ------------------------------
+# Tarea para carga masiva (COPY)
+# ------------------------------
 @task(retries=1, retry_delay_seconds=10, log_prints=False)
 def bulk_load(
     table: str,
@@ -110,82 +123,69 @@ def bulk_load(
     logger.info(f"Iniciando bulk_load en tabla '{table}'. Truncate={truncate}.")
     start_time = time.time()
 
-    # 1. Conectar
-    db = DatabaseConnection()
-    cursor = db.connect()
+    with db_cursor(autocommit=True) as cursor:
+        if truncate:
+            cursor.execute(f"TRUNCATE {table} RESTART IDENTITY CASCADE;")
+            cursor.execute(f"ALTER TABLE {table} DISABLE TRIGGER ALL;")
+            logger.info(f"Tabla '{table}' truncada y triggers deshabilitados.")
 
-    # 2. Truncate si corresponde
-    if truncate:
-        cursor.execute(f"TRUNCATE {table} RESTART IDENTITY CASCADE;")
-        cursor.execute(f"ALTER TABLE {table} DISABLE TRIGGER ALL;")
-        logger.info(f"Tabla '{table}' truncada y triggers deshabilitados.")
+        # Crear CSV temporal
+        count = 0
+        with tempfile.NamedTemporaryFile(
+            mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
+        ) as tmp:
+            writer = csv.writer(tmp, lineterminator="\n")
+            writer.writerow(columns)
+            for rec in records:
+                if filter_fn and not filter_fn(rec):
+                    continue
+                row = []
+                for col in columns:
+                    val = rec.get(field_map.get(col, col)) if field_map else rec.get(col)
+                    row.append(r'\N' if val in (None, "", "None") else val)
+                    count += 1
+                writer.writerow(row)
+            tmp_path = tmp.name
 
-    # 3. Crear CSV en archivo temporal
-    count = 0
-    with tempfile.NamedTemporaryFile(
-        mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
-    ) as tmp:
-        writer = csv.writer(tmp, lineterminator="\n")
-        # Escribir cabecera
-        writer.writerow(columns)
-        # Escribir filas
-        for rec in records:
-            if filter_fn and not filter_fn(rec):
-                continue
-            # Mapear campos y convertir None/"" a \N para COPY
-            row = []
-            for col in columns:
-                val = rec.get(field_map.get(col, col)) if field_map else rec.get(col)
-                if val in (None, "", "None"):
-                    row.append(r'\N')
-                else:
-                    # val ya viene decodificado CP1252 en read_dbf
-                    row.append(val)
-                count += 1
-            writer.writerow(row)
+        logger.info(f"{count} registros escritos en temporal: {tmp_path}")
 
-        tmp_path = tmp.name
+        with open(tmp_path, "r", encoding="utf-8") as f:
+            cols_sql = ", ".join(columns)
+            copy_sql = (
+                f"COPY {table} ({cols_sql}) "
+                "FROM STDIN WITH (FORMAT csv, HEADER TRUE, NULL '\\N');"
+            )
+            cursor.copy_expert(copy_sql, f)
+            logger.info(f"COPY ejecutado en tabla '{table}'.")
 
-    logger.info(f"{count} registros escritos en temporal: {tmp_path}")
+        if truncate:
+            cursor.execute(f"ALTER TABLE {table} ENABLE TRIGGER ALL;")
+            logger.info(f"Triggers reactivados en tabla '{table}'.")
 
-    # 4. Ejecutar COPY desde el archivo temporal
-    with open(tmp_path, "r", encoding="utf-8") as f:
-        cols_sql = ", ".join(columns)
-        copy_sql = (
-            f"COPY {table} ({cols_sql}) "
-            "FROM STDIN WITH (FORMAT csv, HEADER TRUE, NULL '\\N');"
-        )
-        cursor.copy_expert(copy_sql, f)
-        logger.info(f"COPY ejecutado en tabla '{table}'.")
-
-    # 5. Rehabilitar triggers si truncamos
-    if truncate:
-        cursor.execute(f"ALTER TABLE {table} ENABLE TRIGGER ALL;")
-        logger.info(f"Triggers reactivados en tabla '{table}'.")
-
-    # 6. Limpiar y medir tiempo
     os.remove(tmp_path)
     elapsed = round(time.time() - start_time, 2)
     logger.info(f"bulk_load completado: {count} registros en {elapsed}s.")
     return True
 
 
-
-# Tarea para ejecutar consultas\@
+# -------------------------
+# Tarea para ejecutar query
+# -------------------------
 @task(retries=2, retry_delay_seconds=10)
 def execute_query(sql_query: str):
     logger = get_run_logger()
     logger.info("Ejecutando consulta SQL...")
-    db = connect_db()
-    cursor = db.connect()
-    cursor.execute(sql_query)
-    data = cursor.fetchall()
-    columns = [desc[0] for desc in cursor.description]
-    logger.info(f"Consulta ejecutada: {len(data)} filas obtenidas.")
+    with db_cursor(autocommit=True) as cursor:
+        cursor.execute(sql_query)
+        data = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
+        logger.info(f"Consulta ejecutada: {len(data)} filas obtenidas.")
     return data, columns
 
 
-# Tarea para transformar y cargar datos desde consulta a tabla destino\@
+# --------------------------------------------------
+# Tarea para transformar y cargar datos desde query
+# --------------------------------------------------
 @task(retries=3, retry_delay_seconds=20, log_prints=False)
 def load_data_table(
     name_table_target: str,
@@ -198,110 +198,89 @@ def load_data_table(
     logger.info(f"Iniciando transformación y carga en tabla destino: {name_table_target}")
     start_time = time.time()
 
-    # 1. Ejecutar query y obtener datos
     data, columns = execute_query.with_options(name=f"TRANSFORMA-{name_table_target}")(sql_query)
 
-    # 2. Conectar
-    db = connect_db()
-    cursor = db.connect()
+    with db_cursor(autocommit=True) as cursor:
+        if truncate:
+            cursor.execute(f"TRUNCATE TABLE {name_table_target} RESTART IDENTITY CASCADE;")
+            cursor.execute(f"ALTER TABLE {name_table_target} DISABLE TRIGGER ALL;")
+            logger.info(f"Triggers deshabilitados en '{name_table_target}'.")
 
-    # 3. Truncate y deshabilitar triggers si corresponde
-    if truncate:
-        logger.info(f"Truncando y deshabilitando triggers en {name_table_target}")
-        cursor.execute(f"TRUNCATE TABLE {name_table_target} RESTART IDENTITY CASCADE;")
-        cursor.execute(f"ALTER TABLE {name_table_target} DISABLE TRIGGER ALL;")
+        count = 0
+        with tempfile.NamedTemporaryFile(
+            mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
+        ) as tmp:
+            writer = csv.writer(tmp, lineterminator="\n")
+            writer.writerow(columns)
+            for row in data:
+                record = dict(zip(columns, row)) if not isinstance(row, dict) else row
+                if filter_fn and not filter_fn(record):
+                    continue
+                out_row = [r'\N' if record.get(field_map.get(col, col) if field_map else col) in (None, "", "None")
+                           else record.get(field_map.get(col, col) if field_map else col)
+                           for col in columns]
+                writer.writerow(out_row)
+                count += 1
+            tmp_path = tmp.name
 
-    # 4. Crear CSV en archivo temporal
-    count = 0
-    with tempfile.NamedTemporaryFile(
-        mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
-    ) as tmp:
-        writer = csv.writer(tmp, lineterminator="\n")
-        writer.writerow(columns)  # cabecera
+        logger.info(f"{count} registros escritos en temporal: {tmp_path}")
 
-        for row in data:
-            # opcional: interpretar row como dict si viene así, o lista por posición
-            record = dict(zip(columns, row)) if not isinstance(row, dict) else row
-            if filter_fn and not filter_fn(record):
-                continue
+        with open(tmp_path, "r", encoding="utf-8") as f:
+            cols_sql = ", ".join(columns)
+            copy_sql = (
+                f"COPY {name_table_target} ({cols_sql}) "
+                "FROM STDIN WITH (FORMAT csv, HEADER TRUE, NULL '\\N');"
+            )
+            cursor.copy_expert(copy_sql, f)
+            logger.info(f"COPY ejecutado en tabla '{name_table_target}'.")
 
-            # preparar valores con field_map y NULL marker '\N'
-            out_row = []
-            for col in columns:
-                key = field_map.get(col, col) if field_map else col
-                val = record.get(key)
-                if val in (None, "", "None"):
-                    out_row.append(r'\N')
-                else:
-                    out_row.append(val)
-            writer.writerow(out_row)
-            count += 1
+        if truncate:
+            cursor.execute(f"ALTER TABLE {name_table_target} ENABLE TRIGGER ALL;")
+            logger.info(f"Triggers reactivados en tabla '{name_table_target}'.")
 
-        tmp_path = tmp.name
-
-    logger.info(f"{count} registros escritos en temporal: {tmp_path}")
-
-    # 5. Ejecutar COPY desde el archivo temporal
-    with open(tmp_path, "r", encoding="utf-8") as f:
-        cols_sql = ", ".join(columns)
-        copy_sql = (
-            f"COPY {name_table_target} ({cols_sql}) "
-            "FROM STDIN WITH (FORMAT csv, HEADER TRUE, NULL '\\N');"
-        )
-        cursor.copy_expert(copy_sql, f)
-        logger.info(f"COPY ejecutado en tabla '{name_table_target}'.")
-
-    # 6. Reactivar triggers si truncamos
-    if truncate:
-        cursor.execute(f"ALTER TABLE {name_table_target} ENABLE TRIGGER ALL;")
-        logger.info(f"Triggers reactivados en tabla '{name_table_target}'.")
-
-    # 7. Limpiar y medir tiempo
     os.remove(tmp_path)
     elapsed = round(time.time() - start_time, 2)
     logger.info(f"load_data_table completado: {count} registros en {elapsed}s.")
     return True
 
+
+# ------------------------
+# Definición de los flows
+# ------------------------
 @flow(name="ETL-SIG:Extraccion")
 def extract() -> None:
-    #copy_file_from_share()
-    #descomprime_rar()
-        # ETAPA EXTRACT
     tables = load_table_configs()
     for cfg in tables:
-        read_task = read_dbf.with_options(name=f"LECTURA-DBF-{cfg.key.upper()}")
-        data = read_task(cfg.path)
+        data = read_dbf.with_options(name=f"LECTURA-DBF-{cfg.key.upper()}")(cfg.path)
         filter_fn = build_filter(cfg.filter_fields) if cfg.filter_fields else None
-        bulk_task = bulk_load.with_options(name=f"CARGA-INFO-{cfg.key.upper()}")
-        bulk_task(
+        bulk_load.with_options(name=f"CARGA-INFO-{cfg.key.upper()}")(
             table=cfg.table,
             columns=cfg.columns,
             records=data,
             field_map=cfg.field_map,
             filter_fn=filter_fn,
             truncate=cfg.truncate,
-    )
+        )
+
 
 @flow(name="ETL-SIG:Transformacion_carga")
-def transform_load():
-
-    # ETAPA TRANSFORM & LOAD
+def transform_load() -> None:
     query_tables = load_query_tables()
     for table in query_tables:
-        load_task = load_data_table.with_options(name=f"CARGA-QUERY-{table.table}")
-        load_task(table.table, table.query)
+        load_data_table.with_options(name=f"CARGA-QUERY-{table.table}")(
+            name_table_target=table.table,
+            sql_query=table.query,
+        )
 
 
 @flow(name="ETL-SIG")
 def etl_sig() -> None:
     logger = get_run_logger()
-    ruta_actual = os.getcwd()
-    logger.info(f"La ruta actual es: {ruta_actual}")
+    logger.info(f"La ruta actual es: {os.getcwd()}")
     extract()
-    #transform_load()
-    db =  connect_db()
-    db.close()
+    # transform_load()
+    logger.info("ETL finalizado.")
 
 
 if __name__ == "__main__":
-    etl_sig.serve(name="ETL-SIG-DEPLOYMENT",cron="0 0 * * *")
+    etl_sig.serve(name="ETL-SIG-DEPLOYMENT", cron="0 0 * * *")
