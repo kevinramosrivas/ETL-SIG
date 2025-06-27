@@ -186,7 +186,7 @@ def execute_query(sql_query: str):
 # --------------------------------------------------
 # Tarea para transformar y cargar datos desde query
 # --------------------------------------------------
-@task(retries=3, retry_delay_seconds=20, log_prints=False)
+@task(retries=3, retry_delay_seconds=20)
 def load_data_table(
     name_table_target: str,
     sql_query: str,
@@ -277,7 +277,7 @@ def transform_load() -> None:
 def etl_sig() -> None:
     logger = get_run_logger()
     logger.info(f"La ruta actual es: {os.getcwd()}")
-    extract()
+    #extract()
     transform_load()
     logger.info("ETL finalizado.")
 
