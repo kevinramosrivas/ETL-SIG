@@ -168,21 +168,6 @@ def bulk_load(
     return True
 
 
-# -------------------------
-# Tarea para ejecutar query
-# -------------------------
-@task(retries=2, retry_delay_seconds=10)
-def execute_query(sql_query: str):
-    logger = get_run_logger()
-    logger.info("Ejecutando consulta SQL...")
-    with db_cursor(autocommit=True) as cursor:
-        cursor.execute(sql_query)
-        data = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-        logger.info(f"Consulta ejecutada: {len(data)} filas obtenidas.")
-    return data, columns
-
-
 # --------------------------------------------------
 # Tarea para transformar y cargar datos desde query
 # --------------------------------------------------
@@ -198,9 +183,13 @@ def load_data_table(
     logger.info(f"Iniciando transformacion y carga en tabla destino: {name_table_target}")
     start_time = time.time()
 
-    data, columns = execute_query.with_options(name=f"TRANSFORMA-{name_table_target}")(sql_query)
 
     with db_cursor(autocommit=True) as cursor:
+        logger.info("Ejecutando consulta SQL...")
+        cursor.execute(sql_query)
+        data = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
+        logger.info(f"Consulta ejecutada: {len(data)} filas obtenidas.")
         if truncate:
             cursor.execute(f"TRUNCATE TABLE {name_table_target} RESTART IDENTITY CASCADE;")
             cursor.execute(f"ALTER TABLE {name_table_target} DISABLE TRIGGER ALL;")
