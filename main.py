@@ -36,7 +36,7 @@ def db_cursor(autocommit: bool = True):
     try:
         conn.autocommit = autocommit
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        yield cursor
+        yield conn,cursor
     finally:
         cursor.close()
         conn.close()
@@ -110,7 +110,7 @@ def read_dbf(path: str) -> Iterable[Dict[str, Any]]:
 # ------------------------------
 # Tarea para carga masiva (COPY)
 # ------------------------------
-@task(retries=1, retry_delay_seconds=10, log_prints=False)
+@task(retries=3, retry_delay_seconds=10, log_prints=False)
 def bulk_load(
     table: str,
     columns: List[str],
@@ -123,49 +123,56 @@ def bulk_load(
     logger.info(f"Iniciando bulk_load en tabla '{table}'. Truncate={truncate}.")
     start_time = time.time()
 
-    with db_cursor(autocommit=True) as cursor:
-        if truncate:
-            cursor.execute(f"TRUNCATE {table} RESTART IDENTITY CASCADE;")
-            cursor.execute(f"ALTER TABLE {table} DISABLE TRIGGER ALL;")
-            logger.info(f"Tabla '{table}' truncada y triggers deshabilitados.")
+    with db_cursor(autocommit=False) as (conn,cursor):
+        try:
+            # Crear CSV temporal
+            count = 0
+            with tempfile.NamedTemporaryFile(
+                mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
+            ) as tmp:
+                writer = csv.writer(tmp, lineterminator="\n")
+                writer.writerow(columns)
+                for rec in records:
+                    if filter_fn and not filter_fn(rec):
+                        continue
+                    row = []
+                    for col in columns:
+                        val = rec.get(field_map.get(col, col)) if field_map else rec.get(col)
+                        row.append(r'\N' if val in (None, "", "None") else val)
+                        count += 1
+                    writer.writerow(row)
+                tmp_path = tmp.name
 
-        # Crear CSV temporal
-        count = 0
-        with tempfile.NamedTemporaryFile(
-            mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
-        ) as tmp:
-            writer = csv.writer(tmp, lineterminator="\n")
-            writer.writerow(columns)
-            for rec in records:
-                if filter_fn and not filter_fn(rec):
-                    continue
-                row = []
-                for col in columns:
-                    val = rec.get(field_map.get(col, col)) if field_map else rec.get(col)
-                    row.append(r'\N' if val in (None, "", "None") else val)
-                    count += 1
-                writer.writerow(row)
-            tmp_path = tmp.name
+            logger.info(f"{count} registros escritos en temporal: {tmp_path}")
 
-        logger.info(f"{count} registros escritos en temporal: {tmp_path}")
+            if truncate:
+                cursor.execute(f"TRUNCATE {table} RESTART IDENTITY CASCADE;")
+                cursor.execute(f"ALTER TABLE {table} DISABLE TRIGGER ALL;")
+                logger.info(f"Tabla '{table}' truncada y triggers deshabilitados.")
 
-        with open(tmp_path, "r", encoding="utf-8") as f:
-            cols_sql = ", ".join(columns)
-            copy_sql = (
-                f"COPY {table} ({cols_sql}) "
-                "FROM STDIN WITH (FORMAT csv, HEADER TRUE, NULL '\\N');"
-            )
-            cursor.copy_expert(copy_sql, f)
-            logger.info(f"COPY ejecutado en tabla '{table}'.")
+            with open(tmp_path, "r", encoding="utf-8") as f:
+                cols_sql = ", ".join(columns)
+                copy_sql = (
+                    f"COPY {table} ({cols_sql}) "
+                    "FROM STDIN WITH (FORMAT csv, HEADER TRUE, NULL '\\N');"
+                )
+                cursor.copy_expert(copy_sql, f)
+                logger.info(f"COPY ejecutado en tabla '{table}'.")
 
-        if truncate:
-            cursor.execute(f"ALTER TABLE {table} ENABLE TRIGGER ALL;")
-            logger.info(f"Triggers reactivados en tabla '{table}'.")
-
-    os.remove(tmp_path)
-    elapsed = round(time.time() - start_time, 2)
-    logger.info(f"bulk_load completado: {count} registros en {elapsed}s.")
-    return True
+            if truncate:
+                cursor.execute(f"ALTER TABLE {table} ENABLE TRIGGER ALL;")
+                logger.info(f"Triggers reactivados en tabla '{table}'.")
+            conn.commit()
+        except (Exception) as e:
+            logger.error(f"Error durante la transacción para '{table}'. Revirtiendo cambios (rollback)...")
+            conn.rollback()
+            raise e
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            elapsed = round(time.time() - start_time, 2)
+            logger.info(f"bulk_load completado: {count} registros en {elapsed}s.")
+            return True
 
 
 # --------------------------------------------------
@@ -184,53 +191,61 @@ def load_data_table(
     start_time = time.time()
 
 
-    with db_cursor(autocommit=True) as cursor:
-        logger.info("Ejecutando consulta SQL...")
-        cursor.execute(sql_query)
-        data = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-        logger.info(f"Consulta ejecutada: {len(data)} filas obtenidas.")
-        if truncate:
-            cursor.execute(f"TRUNCATE TABLE {name_table_target} RESTART IDENTITY CASCADE;")
-            cursor.execute(f"ALTER TABLE {name_table_target} DISABLE TRIGGER ALL;")
-            logger.info(f"Triggers deshabilitados en '{name_table_target}'.")
+    with db_cursor(autocommit=False) as (conn,cursor):
+        try:
+            logger.info("Ejecutando consulta SQL...")
+            cursor.execute(sql_query)
+            data = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            logger.info(f"Consulta ejecutada: {len(data)} filas obtenidas.")
+            count = 0
+            with tempfile.NamedTemporaryFile(
+                mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
+            ) as tmp:
+                writer = csv.writer(tmp, lineterminator="\n")
+                writer.writerow(columns)
+                for row in data:
+                    record = dict(zip(columns, row)) if not isinstance(row, dict) else row
+                    if filter_fn and not filter_fn(record):
+                        continue
+                    out_row = [r'\N' if record.get(field_map.get(col, col) if field_map else col) in (None, "", "None")
+                            else record.get(field_map.get(col, col) if field_map else col)
+                            for col in columns]
+                    writer.writerow(out_row)
+                    count += 1
+                tmp_path = tmp.name
 
-        count = 0
-        with tempfile.NamedTemporaryFile(
-            mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
-        ) as tmp:
-            writer = csv.writer(tmp, lineterminator="\n")
-            writer.writerow(columns)
-            for row in data:
-                record = dict(zip(columns, row)) if not isinstance(row, dict) else row
-                if filter_fn and not filter_fn(record):
-                    continue
-                out_row = [r'\N' if record.get(field_map.get(col, col) if field_map else col) in (None, "", "None")
-                           else record.get(field_map.get(col, col) if field_map else col)
-                           for col in columns]
-                writer.writerow(out_row)
-                count += 1
-            tmp_path = tmp.name
+            logger.info(f"{count} registros escritos en temporal: {tmp_path}")
 
-        logger.info(f"{count} registros escritos en temporal: {tmp_path}")
+            if truncate:
+                cursor.execute(f"TRUNCATE TABLE {name_table_target} RESTART IDENTITY CASCADE;")
+                cursor.execute(f"ALTER TABLE {name_table_target} DISABLE TRIGGER ALL;")
+                logger.info(f"Triggers deshabilitados en '{name_table_target}'.")
 
-        with open(tmp_path, "r", encoding="utf-8") as f:
-            cols_sql = ", ".join(columns)
-            copy_sql = (
-                f"COPY {name_table_target} ({cols_sql}) "
-                "FROM STDIN WITH (FORMAT csv, HEADER TRUE, NULL '\\N');"
-            )
-            cursor.copy_expert(copy_sql, f)
-            logger.info(f"COPY ejecutado en tabla '{name_table_target}'.")
 
-        if truncate:
-            cursor.execute(f"ALTER TABLE {name_table_target} ENABLE TRIGGER ALL;")
-            logger.info(f"Triggers reactivados en tabla '{name_table_target}'.")
+            with open(tmp_path, "r", encoding="utf-8") as f:
+                cols_sql = ", ".join(columns)
+                copy_sql = (
+                    f"COPY {name_table_target} ({cols_sql}) "
+                    "FROM STDIN WITH (FORMAT csv, HEADER TRUE, NULL '\\N');"
+                )
+                cursor.copy_expert(copy_sql, f)
+                logger.info(f"COPY ejecutado en tabla '{name_table_target}'.")
 
-    os.remove(tmp_path)
-    elapsed = round(time.time() - start_time, 2)
-    logger.info(f"load_data_table completado: {count} registros en {elapsed}s.")
-    return True
+            if truncate:
+                cursor.execute(f"ALTER TABLE {name_table_target} ENABLE TRIGGER ALL;")
+                logger.info(f"Triggers reactivados en tabla '{name_table_target}'.")
+            conn.commit()
+        except (Exception) as e:
+            logger.error(f"Error durante la transacción para transformacion y carga '{name_table_target}'. Revirtiendo cambios (rollback)...")
+            conn.rollback()
+            raise e
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            elapsed = round(time.time() - start_time, 2)
+            logger.info(f"load_data_table completado: {count} registros en {elapsed}s.")
+            return True
 
 
 # ------------------------
@@ -266,7 +281,7 @@ def transform_load() -> None:
 def etl_sig() -> None:
     logger = get_run_logger()
     logger.info(f"La ruta actual es: {os.getcwd()}")
-    #extract()
+    extract()
     transform_load()
     logger.info("ETL finalizado.")
 
