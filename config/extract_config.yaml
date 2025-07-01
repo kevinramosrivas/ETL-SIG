@@ -1,0 +1,385 @@
+defaults:
+  truncate: true
+
+tables:
+  - key: certificado
+    source: certificado.dbf
+    target: bytsscom_bytsiaf.certificado
+    filters:
+      ANO_EJE: __YEARS__
+      ESTADO_REG: ["A"]
+      TIPO_CERTI: ["2"]
+    columns:
+      - ANO_EJE
+      - CERTIFICADO
+      - SEC_EJEC
+      - TIPO_CERTIFICADO
+      - ESTADO_REGISTRO
+      - COD_ERROR
+      - COD_MENSA
+      - ESTADO_ENVIO
+    field_map:
+      CERTIFICADO: CERTIFICAD
+      TIPO_CERTIFICADO: TIPO_CERTI
+      ESTADO_REGISTRO: ESTADO_REG
+      ESTADO_ENVIO: ESTADO_ENV
+
+  - key: certificado_fase
+    source: certificado_fase.dbf
+    target: bytsscom_bytsiaf.certificado_fase
+    filters:
+      ANO_EJE: __YEARS__
+    columns:
+      - ANO_EJE
+      - SEC_EJEC
+      - CERTIFICADO
+      - SECUENCIA
+      - SECUENCIA_PADRE
+      - FUENTE_FINANC
+      - ETAPA
+      - TIPO_ID
+      - RUC
+      - ES_COMPROMISO
+      - MONTO
+      - MONTO_COMPROMETIDO
+      - MONTO_NACIONAL
+      - GLOSA
+      - ESTADO_REGISTRO
+      - COD_ERROR
+      - COD_MENSA
+      - ESTADO_ENVIO
+      - SALDO_NACIONAL
+      - IND_ANULACION
+      - TIPO_FINANCIAMIENTO
+      - TIPO_OPERACION
+      - SEC_AREA
+    field_map:
+      CERTIFICADO: CERTIFICAD
+      SECUENCIA_PADRE: SECUENCIA_
+      FUENTE_FINANC: FUENTE_FIN
+      ES_COMPROMISO: ES_COMPROM
+      MONTO_COMPROMETIDO: MONTO_COMP
+      MONTO_NACIONAL: MONTO_NACI
+      ESTADO_REGISTRO: ESTADO_REG
+      ESTADO_ENVIO: ESTADO_ENV
+      SALDO_NACIONAL: SALDO_NACI
+      IND_ANULACION: IND_ANULAC
+      TIPO_FINANCIAMIENTO: TIPO_FINAN
+      TIPO_OPERACION: TIPO_OPERA
+
+  - key: certificado_secuencia
+    source: certificado_secuencia.dbf
+    target: bytsscom_bytsiaf.certificado_secuencia
+    filters:
+      ANO_EJE: __YEARS__
+    columns:
+      - ANO_EJE
+      - SEC_EJEC
+      - CERTIFICADO
+      - SECUENCIA
+      - CORRELATIVO
+      - COD_DOC
+      - NUM_DOC
+      - FECHA_DOC
+      - ESTADO_REGISTRO
+      - ESTADO_ENVIO
+      - IND_CERTIFICACION
+      - ESTADO_REGISTRO2
+      - ESTADO_ENVIO2
+      - MONTO
+      - MONTO_COMPROMETIDO
+      - MONTO_NACIONAL
+      - MONEDA
+      - TIPO_CAMBIO
+      - COD_ERROR
+      - COD_MENSA
+      - TIPO_REGISTRO
+      - FECHA_BD_ORACLE
+      - ESTADO_CTB
+      - SECUENCIA_SOLICITUD
+      - FECHA_CREACION_CLT
+      - FECHA_MODIFICACION_CLT
+      - FLG_INTERFASE
+    field_map:
+      CERTIFICADO: CERTIFICAD
+      CORRELATIVO: CORRELATIV
+      MONTO_COMPROMETIDO: MONTO_COMP
+      MONTO_NACIONAL: MONTO_NACI
+      ESTADO_REGISTRO: ESTADO_REG
+      ESTADO_ENVIO: ESTADO_ENV
+      IND_CERTIFICACION: IND_CERTIF
+      TIPO_CAMBIO: TIPO_CAMBI
+      TIPO_REGISTRO: TIPO_REGIS
+      FECHA_BD_ORACLE: FECHA_BD_O
+      FECHA_CREACION_CLT: FECHA_CREA
+      FECHA_MODIFICACION_CLT: FECHA_MODI
+
+  - key: certificado_meta
+    source: certificado_meta.dbf
+    target: bytsscom_bytsiaf.certificado_meta
+    filters:
+      ANO_EJE: __YEARS__
+    columns:
+      - ANO_EJE
+      - SEC_EJEC
+      - CERTIFICADO
+      - SECUENCIA
+      - CORRELATIVO
+      - ID_CLASIFICADOR
+      - SEC_FUNC
+      - MONTO
+      - MONTO_COMPROMETIDO
+      - MONTO_NACIONAL
+      - ESTADO_REGISTRO
+      - COD_ERROR
+      - COD_MENSA
+      - ESTADO_ENVIO
+      - MONTO_NACIONAL_AJUSTE
+      - SYS_COD_CLASIF
+      - SYS_ID_CLASIFICADOR
+    field_map:
+      CERTIFICADO: CERTIFICAD
+      CORRELATIVO: CORRELATIV
+      MONTO_COMPROMETIDO: MONTO_COMP
+      MONTO_NACIONAL: MONTO_NACI
+      ESTADO_REGISTRO: ESTADO_REG
+      ESTADO_ENVIO: ESTADO_ENV
+      ID_CLASIFICADOR: ID_CLASIFI
+      MONTO_NACIONAL_AJUSTE: MONTO_NAC2
+
+  - key: expediente_fase
+    source: expediente_fase.dbf
+    target: bytsscom_bytsiaf.expediente_fase
+    filters:
+      ANO_EJE: __YEARS__
+    columns:
+      - ANO_EJE
+      - SEC_EJEC
+      - EXPEDIENTE
+      - CICLO
+      - FASE
+      - SECUENCIA
+      - SECUENCIA_PADRE
+      - SECUENCIA_ANTERIOR
+      - MES_CTB
+      - MONTO_NACIONAL
+      - MONTO_SALDO
+      - ORIGEN
+      - FUENTE_FINANC
+      - MEJOR_FECHA
+      - TIPO_ID
+      - RUC
+      - TIPO_PAGO
+      - TIPO_RECURSO
+      - TIPO_COMPROMISO
+      - ORGANISMO
+      - PROYECTO
+      - ESTADO
+      - ESTADO_ENVIO
+      - ARCHIVO
+      - TIPO_GIRO
+      - TIPO_FINANCIAMIENTO
+      - COD_DOC_REF
+      - FECHA_DOC_REF
+      - NUM_DOC_REF
+      - CERTIFICADO
+      - CERTIFICADO_SECUENCIA
+      - SEC_EJEC_RUC
+    field_map:
+      SECUENCIA_PADRE: SECUENCIA2
+      SECUENCIA_ANTERIOR: SECUENCIA_
+      MONTO_NACIONAL: MONTO_NACI
+      MONTO_SALDO: MONTO_SALD
+      FUENTE_FINANC: FUENTE_FIN
+      MEJOR_FECHA: MEJOR_FECH
+      TIPO_RECURSO: TIPO_RECUR
+      TIPO_COMPROMISO: TIPO_COMPR
+      TIPO_FINANCIAMIENTO: TIPO_FINAN
+      COD_DOC_REF: COD_DOC_RE
+      FECHA_DOC_REF: FECHA_DOC_
+      NUM_DOC_REF: NUM_DOC_RE
+      CERTIFICADO: CERTIFICAD
+      CERTIFICADO_SECUENCIA: CERTIFICA2
+      SEC_EJEC_RUC: SEC_EJEC_R
+
+  - key: expediente_secuencia
+    source: expediente_secuencia.dbf
+    target: bytsscom_bytsiaf.expediente_secuencia
+    filters:
+      ANO_EJE: __YEARS__
+    columns:
+      - ANO_EJE
+      - SEC_EJEC
+      - EXPEDIENTE
+      - CICLO
+      - FASE
+      - SECUENCIA
+      - CORRELATIVO
+      - COD_DOC
+      - NUM_DOC
+      - FECHA_DOC
+      - MONEDA
+      - TIPO_CAMBIO
+      - MONTO
+      - MONTO_SALDO
+      - MONTO_NACIONAL
+      - MONTO_EXTRANJERO
+      - FECHA_ING
+      - USUARIO_ING
+      - FECHA_MOD
+      - USUARIO_MOD
+      - NUM_RECORD
+      - SERIE_DOC
+      - ANO_PROCESO
+      - MES_PROCESO
+      - DIA_PROCESO
+      - GRUPO
+      - EDICION
+      - ANO_CTA_CTE
+      - BANCO
+      - CTA_CTE
+      - FECHA_AUTORIZACION
+      - COD_MENSA
+      - ESTADO_CTB
+      - ESTADO_CTB_ANTERIOR
+      - ESTADO
+      - ESTADO_ANTERIOR
+      - ESTADO_ENVIO
+      - ARCHIVO
+      - REG_MULTIPLE
+      - CTA_BCO_EJEC
+      - FLG_INTERFASE
+      - IND_CONTABILIZA
+      - TIPO_CAMBIO_PS
+      - SEC_PROCESO
+      - COD_DOC_B
+      - FECHA_DOC_B
+      - NUM_DOC_B
+      - FECHA_BD_ORACLE
+      - MES_AFECTACION_CALENDARIO
+      - SECUENCIA_SOLICITUD
+      - FECHA_CREACION_CLT
+      - FECHA_MODIFICACION_CLT
+      - USUARIO_CREACION_CLT
+      - USUARIO_MODIFICACION_CLT
+      - FECHA_AUTORIZACION_GIRO
+      - VERIFICA_1
+    field_map:
+      CORRELATIVO: CORRELATIV
+      TIPO_CAMBIO: TIPO_CAMBI
+      MONTO_SALDO: MONTO_SALD
+      MONTO_NACIONAL: MONTO_NACI
+      MONTO_EXTRANJERO: MONTO_EXTR
+      USUARIO_ING: USUARIO_IN
+      USUARIO_MOD: USUARIO_MO
+      ANO_CTA_CTE: ANO_CTA_CT
+      FECHA_AUTORIZACION: FECHA_AUTO
+      ESTADO_CTB_ANTERIOR: ESTADO_CT2
+      ESTADO_ANTERIOR: ESTADO_ANT
+      REG_MULTIPLE: REG_MULTIP
+      CTA_BCO_EJEC: CTA_BCO_EJ
+      FLG_INTERFASE: FLG_INTERF
+      IND_CONTABILIZA: IND_CONTAB
+      TIPO_CAMBIO_PS: TIPO_CAMB2
+      FECHA_DOC_B: FECHA_DOC_
+      NUM_DOC_B: NUM_DOC_B
+      FECHA_BD_ORACLE: FECHA_BD_O
+      MES_AFECTACION_CALENDARIO: MES_AFECTA
+      SECUENCIA_SOLICITUD: SECUENCIA_
+      FECHA_CREACION_CLT: FECHA_CREA
+      FECHA_MODIFICACION_CLT: FECHA_MODI
+      USUARIO_CREACION_CLT: USUARIO_CR
+      USUARIO_MODIFICACION_CLT: USUARIO_M2
+      FECHA_AUTORIZACION_GIRO: FECHA_AUT2
+
+  - key: expediente
+    source: expediente.dbf
+    target: bytsscom_bytsiaf.expediente
+    filters:
+      ANO_EJE: __YEARS__
+    columns:
+      - ANO_EJE
+      - SEC_EJEC
+      - EXPEDIENTE
+      - MES_EJE
+      - COD_DOC
+      - NUM_DOC
+      - FECHA_DOC
+      - FECHA_ING
+      - USUARIO_ING
+      - FECHA_MOD
+      - USUARIO_MOD
+      - TIPO_OPERACION
+      - SEC_EJEC2
+      - MODALIDAD_COMPRA
+      - CLASE_MENOR_CUANTIA
+      - SEC_AREA
+      - FLAG_ENCARGO
+      - EXPEDIENTE_ENCARGANTE
+      - COD_MENSA
+      - ESTADO
+      - ESTADO_ENVIO
+      - ARCHIVO
+      - TIPO_PROCESO
+      - ID_PROCESO
+      - ID_CONTRATO
+      - SEC_EJEC_CONTRATO
+      - FASE_CONTRACTUAL
+      - PROCEDENCIA
+      - EXPEDIENTE_FINANCIAMIENTO
+    field_map:
+      USUARIO_ING: USUARIO_IN
+      USUARIO_MOD: USUARIO_MO
+      TIPO_OPERACION: TIPO_OPERA
+      MODALIDAD_COMPRA: MODALIDAD_
+      CLASE_MENOR_CUANTIA: CLASE_MENO
+      FLAG_ENCARGO: FLAG_ENCAR
+      EXPEDIENTE_ENCARGANTE: EXPEDIENT2
+      ESTADO_ENVIO: ESTADO_ENV
+      TIPO_PROCESO: TIPO_PROCE
+      ID_CONTRATO: ID_CONTRAT
+      SEC_EJEC_CONTRATO: SEC_EJEC_C
+      FASE_CONTRACTUAL: FASE_CONTR
+      PROCEDENCIA: PROCEDENCI
+      EXPEDIENTE_FINANCIAMIENTO: EXPEDIENT3
+
+  - key: expediente_meta
+    source: expediente_meta.dbf
+    target: bytsscom_bytsiaf.expediente_meta
+    filters:
+      ANO_EJE: __YEARS__
+    columns:
+      - ANO_EJE
+      - SEC_EJEC
+      - EXPEDIENTE
+      - CICLO
+      - FASE
+      - SECUENCIA
+      - CORRELATIVO
+      - CATEG_GASTO
+      - GRUPO_GASTO
+      - MODALIDAD_GASTO
+      - ELEMENTO_GASTO
+      - SEC_FUNC
+      - MONTO
+      - MONTO_SALDO
+      - MONTO_NACIONAL
+      - IND_PROCESO
+      - EDICION
+      - ESTADO
+      - ESTADO_ENVIO
+      - ARCHIVO
+      - ID_CLASIFICADOR
+      - SYS_COD_CLASIF
+      - SYS_ID_CLASIFICADOR
+    field_map:
+      CORRELATIVO: CORRELATIV
+      CATEG_GASTO: CATEG_GAST
+      GRUPO_GASTO: GRUPO_GAST
+      MODALIDAD_GASTO: MODALIDAD_
+      ELEMENTO_GASTO: ELEMENTO_G
+      MONTO_SALDO: MONTO_SALD
+      MONTO_NACIONAL: MONTO_NACI
+      IND_PROCESO: IND_PROCES
+      ID_CLASIFICADOR: ID_CLASIFI
+      ESTADO_ENVIO: ESTADO_ENV
