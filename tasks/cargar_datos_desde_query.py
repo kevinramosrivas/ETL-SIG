@@ -7,8 +7,8 @@ import time
 from typing import Any, Callable, Dict, Optional
 import tempfile
 from prefect import get_run_logger, task
+from context.conectar_db import conectar_bd
 
-from main import conectar_bd
 
 
 @task(retries=3, retry_delay_seconds=20)
