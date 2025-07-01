@@ -28,16 +28,14 @@ def cargar_datos_desde_query(
         try:
             logger.info("Ejecutando consulta SQL...")
             cursor.execute(sql_query)
-            data = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
-            logger.info(f"Consulta ejecutada: {len(data)} filas obtenidas.")
             count = 0
             with tempfile.NamedTemporaryFile(
                 mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
             ) as tmp:
                 writer = csv.writer(tmp, lineterminator="\n")
                 writer.writerow(columns)
-                for row in data:
+                for row in cursor:
                     record = dict(zip(columns, row)) if not isinstance(row, dict) else row
                     if filter_fn and not filter_fn(record):
                         continue

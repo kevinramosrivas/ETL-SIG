@@ -10,21 +10,14 @@ import json
 
 def get_years_to_extract(n=2):
     # Leer año actual desde variable, si no existe usar el año actual del sistema
-    anio_actual_str = variables.get("anio_actual", default=str(datetime.datetime.now().now().year))
-    anio_actual = int(anio_actual_str)
-
-    # Leer cuántos años anteriores usar (opcional)
-    anios_anteriores_str = variables.get("anios_anteriores", default="[]")
-    try:
-        anios_anteriores = json.loads(anios_anteriores_str)
-        if not isinstance(anios_anteriores, list):
-            raise ValueError()
-        anios_anteriores = [int(y) for y in anios_anteriores]
-    except Exception:
-        # fallback: generar automáticamente años anteriores
-        anios_anteriores = [anio_actual - i for i in range(1, n + 1)]
-
-    return [str(y) for y in sorted(anios_anteriores + [anio_actual])]
+    periodo_desde = int(variables.get("periodo_desde", default=str(datetime.datetime.now().now().year)))
+    periodo_hasta = int(variables.get("periodo_hasta", default=str(datetime.datetime.now().now().year - n))) 
+    anios = []
+    if(periodo_desde>= periodo_hasta):
+        raise Exception("el periodo desde no puede ser mayor al periodo hasta")
+    for year in range(periodo_desde, periodo_hasta + 1):
+        anios.append(str(year))
+    return anios
 
 
 def load_table_configs(path: str = "extract_config.yaml") -> ExtraTableSettings:
@@ -33,7 +26,6 @@ def load_table_configs(path: str = "extract_config.yaml") -> ExtraTableSettings:
         raw_config = yaml.safe_load(f)
 
     years = get_years_to_extract()
-    print(get_years_to_extract())
     for table in raw_config.get("tables", []):
         filters = table.get("filters", {})
         for k, v in filters.items():
