@@ -73,41 +73,44 @@ tables:
   - table: sistema_informacion_gerencial.hechos_institucional_consolidados
     partitioned: false
     query: |
-      with certificado_anio_area as (
-                  select distinct
-                      c.siaf_certificado,
-                      cert.ano_eje,
-                      a.cod_siaf_area
-                  from bytsscom_bytsig.vw_certificacion c
-                  inner join bytsscom_bytsig.memo_requerimiento m
-                      on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
-                  inner join bytsscom_bytsiaf.certificado cert
-                      on c.id_anio::varchar = cert.ano_eje and c.siaf_certificado = cert.certificado
-                  inner join bytsscom_bytcore.area a
-                      on a.id_area = m.id_area
-                  where c.esta_cert = 'A' and tipo_cert = 'DP'
-              ),
-          certificado_consolidado as (
-              select
-                  ano_eje,
-                  sec_ejec,
-                  certificado,
-                  sum(monto_nacional) as monto_detalle
-                  from
-              bytsscom_bytsiaf.certificado_secuencia
-              where cod_doc in ('086','000')
-              group by ano_eje, sec_ejec, certificado
-              )
-          SELECT
-              cc.ano_eje as anio,
-              cc.certificado as num_certificado,
-              coalesce(caa.cod_siaf_area, '0000') as cod_siaf_area,
-              cc.monto_detalle as monto
-              from
-          certificado_consolidado cc
-          left join certificado_anio_area caa
-              on cc.certificado = caa.siaf_certificado
-              and cc.ano_eje = caa.ano_eje
+        with certificado_anio_area as (
+            select distinct
+                c.siaf_certificado,
+                cert.ano_eje,
+                a.cod_siaf_area
+            from bytsscom_bytsig.vw_certificacion c
+            inner join bytsscom_bytsig.memo_requerimiento m
+                on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
+            inner join bytsscom_bytsiaf.certificado cert
+                on c.id_anio::varchar = cert.ano_eje and c.siaf_certificado = cert.certificado
+            inner join bytsscom_bytcore.area a
+                on a.id_area = m.id_area
+            where c.esta_cert = 'A' and tipo_cert = 'DP'
+        ),
+        certificado_consolidado as (
+            select
+                ano_eje,
+                sec_ejec,
+                certificado,
+                sum(monto_nacional) as monto_detalle
+                from
+            bytsscom_bytsiaf.certificado_secuencia
+            where cod_doc in ('086','000')
+            group by ano_eje, sec_ejec, certificado
+        )
+        SELECT
+            cc.ano_eje as anio,
+            cc.certificado as num_certificado,
+            coalesce(caa.cod_siaf_area, '0000') as cod_siaf_area,
+            cc.monto_detalle as monto
+            from
+        certificado_consolidado cc
+        left join certificado_anio_area caa
+            on cc.certificado = caa.siaf_certificado
+            and cc.ano_eje = caa.ano_eje
+        WHERE
+            ANIO_EJE = __ANIO_EJECUCION__
+        
 
 
   - table: sistema_informacion_gerencial.dm_certificado

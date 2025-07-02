@@ -2,10 +2,9 @@ import datetime
 from config.tables_config import TABLES_QUERY,TableQuery
 from typing import List
 from config.models.extract_model import ExtraTableSettings 
+from config.models.transform_model import TransformTablesConfig
 from pathlib import Path
-from prefect import variables
 import yaml
-import json
 
 
 def get_years_to_extract(n=1):
@@ -33,6 +32,18 @@ def load_table_configs(path: str = "extract_config.yaml") -> ExtraTableSettings:
                 filters[k] = years
 
     return ExtraTableSettings(**raw_config)
+
+
+def load_table_tranform(year:str ,path: str = "transform_config.yaml") -> TransformTablesConfig:
+    full_path = Path(__file__).parent.parent / path
+    with open(full_path, "r", encoding="utf-8") as f:
+        raw_config = yaml.safe_load(f)
+    for table in raw_config.get("tables", []):
+        query:str = table.get("query","")
+        if "__ANIO_EJECUCION__" in query:
+            query = query.replace("__ANIO_EJECUCION__",year)
+    return TransformTablesConfig(**raw_config)
+    
 
 
 def load_query_tables() -> List[TableQuery]:
