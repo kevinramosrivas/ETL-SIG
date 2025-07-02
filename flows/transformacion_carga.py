@@ -1,40 +1,17 @@
-from prefect import task, get_run_logger
-from psycopg2 import sql
-from context.conectar_db import conectar_bd
+from prefect import flow
+from tasks.cargar_datos_desde_query import cargar_datos_desde_query
+from tasks.crear_particiones import crear_particiones
+from config.utils.load_tables_config import get_years_to_extract,load_table_tranform
 
-@task(retries=1, retry_delay_seconds=10)
-def crear_particiones(nombre_tabla: str, anio: str) -> None:
-    logger = get_run_logger()
 
-    if not anio.isdigit():
-        raise ValueError(f"Año inválido: {anio}")
-
-    nombre_particion = f"{nombre_tabla}_{anio}"
-
-    check_sql = sql.SQL("""
-        SELECT to_regclass({partition});
-    """).format(
-        partition=sql.Literal(nombre_particion)
-    )
-
-    create_sql = sql.SQL("""
-        CREATE TABLE {partition}
-        PARTITION OF {parent}
-        FOR VALUES IN (%s);
-    """).format(
-        partition=sql.Identifier(nombre_particion),
-        parent=sql.Identifier(nombre_tabla)
-    )
-
-    with conectar_bd(autocommit=True) as (conn, cursor):
-        logger.info(f"Verificando existencia de partición: {nombre_particion}")
-        cursor.execute(check_sql)
-        exists = cursor.fetchone()[0] is not None
-
-        if exists:
-            logger.info(f"La partición '{nombre_particion}' ya existe. No se crea nuevamente.")
-            return
-
-        logger.info(f"Creando partición '{nombre_particion}' para el año {anio}")
-        cursor.execute(create_sql, [anio])
-        logger.info(f"Partición '{nombre_particion}' creada correctamente.")
+@flow(name="ETL-SIG:Transformacion_carga")
+def trasnformacion_carga() -> None:
+    for anio in get_years_to_extract():
+        config_table_tranform = load_table_tranform(anio)
+        for table_cfg in config_table_tranform.tables:
+            if table_cfg.partitioned:
+                crear_particiones(table_cfg.table,anio)
+            cargar_datos_desde_query.with_options(name=f"CARGA-QUERY-{table_cfg.table}")(
+                name_table_target=table_cfg.table,
+                sql_query=table_cfg.query,
+            )
