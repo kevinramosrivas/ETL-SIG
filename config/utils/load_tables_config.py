@@ -1,5 +1,4 @@
 import datetime
-from config.tables_config import TABLES_QUERY,TableQuery
 from typing import List
 from config.models.extract_model import ExtraTableSettings 
 from config.models.transform_model import TransformTablesConfig
@@ -41,18 +40,6 @@ def load_table_tranform(year:str ,path: str = "transform_config.yaml") -> Transf
     for table in raw_config.get("tables", []):
         query:str = table.get("query","")
         if "__ANIO_EJECUCION__" in query:
-            query = query.replace("__ANIO_EJECUCION__",year)
+            table["query"] = query.replace("__ANIO_EJECUCION__",year)
     return TransformTablesConfig(**raw_config)
     
-
-
-def load_query_tables() -> List[TableQuery]:
-    configs: List[TableQuery] = []
-    for info in TABLES_QUERY:
-        configs.append(
-            TableQuery(
-                table=info["table"],
-                query= info["query"],
-            )
-        )
-    return configs
