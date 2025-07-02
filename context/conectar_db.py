@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from config.settings_config import settings
+from env_config import settings
 import psycopg2
 import psycopg2.extras
 # ----------------------------

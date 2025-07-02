@@ -8,5 +8,5 @@ def crear_particiones(nombre_tabla: str, anio: str) -> list[str]:
         sql = f"""CREATE IF NO EXIST TABLE {nombre_tabla}_{anio}
             PARTITION OF {nombre_tabla}
             FOR VALUES IN ({anio});"""
-        logger.info(sql)
-        # cursor.execute(sql)
+        logger.info(f"Creando partición de tabla {nombre_tabla} para el anio {anio}")
+        cursor.execute(sql)
