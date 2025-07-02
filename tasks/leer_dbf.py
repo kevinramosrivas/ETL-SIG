@@ -6,7 +6,7 @@ import os
 from typing import Any, Dict, Iterable
 from dbfread2 import DBF
 from prefect import get_run_logger, task
-from env_config import settings
+from config.env_config import settings
 
 @task(retries=2, retry_delay_seconds=30)
 def leer_dbf(path: str) -> Iterable[Dict[str, Any]]:

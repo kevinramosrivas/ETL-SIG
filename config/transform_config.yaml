@@ -71,7 +71,7 @@ tables:
       where id_nivel = 2
 
   - table: sistema_informacion_gerencial.hechos_institucional_consolidados
-    partitioned: false
+    partitioned: true
     query: |
         with certificado_anio_area as (
             select distinct

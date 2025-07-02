@@ -11,7 +11,7 @@ def trasnformacion_carga() -> None:
         for table_cfg in config_table_tranform.tables:
             if table_cfg.partitioned:
                 crear_particiones(table_cfg.table,anio)
-            cargar_datos_desde_query.with_options(name=f"CARGA-QUERY-{table_cfg.table}")(
-                name_table_target=table_cfg.table,
-                sql_query=table_cfg.query,
-            )
+            # cargar_datos_desde_query.with_options(name=f"CARGA-QUERY-{table_cfg.table}")(
+            #     name_table_target=table_cfg.table,
+            #     sql_query=table_cfg.query,
+            # )
