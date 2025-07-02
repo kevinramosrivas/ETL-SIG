@@ -7,7 +7,7 @@ from flows.transformacion_carga import trasnformacion_carga
 def etl_sig() -> None:
     logger = get_run_logger()
     logger.info(f"La ruta actual es: {os.getcwd()}")
-    #extraccion()
+    extraccion()
     trasnformacion_carga()
     logger.info("ETL finalizado.")
 
