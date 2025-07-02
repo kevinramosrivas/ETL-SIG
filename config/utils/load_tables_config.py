@@ -8,10 +8,10 @@ import yaml
 import json
 
 
-def get_years_to_extract(n=2):
+def get_years_to_extract(n=1):
     # Leer año actual desde variable, si no existe usar el año actual del sistema
-    periodo_desde = int(variables.get("periodo_desde", default=str(datetime.datetime.now().now().year)))
-    periodo_hasta = int(variables.get("periodo_hasta", default=str(datetime.datetime.now().now().year - n))) 
+    periodo_hasta = int(datetime.datetime.now().now().year)
+    periodo_desde = int(datetime.datetime.now().now().year - n) 
     anios = []
     if(periodo_desde>= periodo_hasta):
         raise Exception("el periodo desde no puede ser mayor al periodo hasta")
