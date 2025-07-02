@@ -1,6 +1,6 @@
-tablas:
-  - tabla: sistema_informacion_gerencial.dm_area
-    particionada: false
+tables:
+  - table: sistema_informacion_gerencial.dm_area
+    partitioned: false
     query: |
       select
           id_area,
@@ -50,8 +50,8 @@ tablas:
           10000 as idsuperior;
 
 
-  - tabla: sistema_informacion_gerencial.dm_fuente
-    particionada: false
+  - table: sistema_informacion_gerencial.dm_fuente
+    partitioned: false
     query: |
       select
           siaf_codigo as fuente_siaf,
@@ -60,8 +60,8 @@ tablas:
       where esta_fuente = '1' and id_fuente < 6
 
 
-  - tabla: sistema_informacion_gerencial.dm_generica
-    particionada: false
+  - table: sistema_informacion_gerencial.dm_generica
+    partitioned: false
     query: |
       select
         id_clasificador as id_generica,
@@ -70,8 +70,8 @@ tablas:
       from bytsscom_bytcore.clasificador
       where id_nivel = 2
 
-  - tabla: sistema_informacion_gerencial.hechos_institucional_consolidados
-    particionada: false
+  - table: sistema_informacion_gerencial.hechos_institucional_consolidados
+    partitioned: false
     query: |
       with certificado_anio_area as (
                   select distinct
@@ -110,8 +110,8 @@ tablas:
               and cc.ano_eje = caa.ano_eje
 
 
-  - tabla: sistema_informacion_gerencial.dm_certificado
-    particionada: false
+  - table: sistema_informacion_gerencial.dm_certificado
+    partitioned: false
     query: |
       with certificado_anio_area as (
               select distinct
@@ -198,8 +198,8 @@ tablas:
           inner join bytsscom_bytcore.meta_institucional mp
               on mis.id_meta_institucional = mp.id_meta_institucional
 
-  - tabla: sistema_informacion_gerencial.dm_expediente
-    particionada: false
+  - table: sistema_informacion_gerencial.dm_expediente
+    partitioned: false
     query: |
       with expediente_generica as (
                   SELECT distinct
@@ -268,8 +268,8 @@ tablas:
               left join expediente_generica cla
                       on cla.codigo_siaf = em.id_clasificador
           where certificado is not null AND ec.ano_eje::double precision = ec.anio_modificacion
-  - tabla: sistema_informacion_gerencial.hechos_pim
-    particionada: false
+  - table: sistema_informacion_gerencial.hechos_pim
+    partitioned: false
     query: |
       SELECT
           id_periodo_pla,
