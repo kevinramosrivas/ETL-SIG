@@ -109,7 +109,7 @@ tables:
             on cc.certificado = caa.siaf_certificado
             and cc.ano_eje = caa.ano_eje
         WHERE
-            cc.ano_eje = __ANIO_EJECUCION__::integer
+            cc.ano_eje = __ANIO_EJECUCION__::varchar
         
 
 
@@ -200,7 +200,7 @@ tables:
               on cm.sec_func = mis.sec_func and cm.ano_eje = mis.id_anio::varchar
           inner join bytsscom_bytcore.meta_institucional mp
               on mis.id_meta_institucional = mp.id_meta_institucional
-        WHERE cc.ano_eje = __ANIO_EJECUCION__::integer
+        WHERE cc.ano_eje = __ANIO_EJECUCION__::varchar
 
   - table: sistema_informacion_gerencial.dm_expediente
     partitioned: true
