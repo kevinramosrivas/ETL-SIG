@@ -38,7 +38,7 @@ def conectar_bd(
 
     except psycopg2.Error as db_err:
         # Capturamos errores de conexión o de psycopg2
-        raise RuntimeError(f"Error en la conexión a BD: {db_err}") from db_err
+        raise RuntimeError(f"Error en la conexion a BD: {db_err}") from db_err
 
     finally:
         # Cerramos cursor y conexión de forma segura

@@ -109,7 +109,7 @@ tables:
             on cc.certificado = caa.siaf_certificado
             and cc.ano_eje = caa.ano_eje
         WHERE
-            ANIO_EJE = __ANIO_EJECUCION__::integer
+            cc.ano_eje = __ANIO_EJECUCION__::integer
         
 
 
@@ -271,7 +271,7 @@ tables:
                   and em.ciclo = 'G' and em.fase = 'D'
               left join expediente_generica cla
                       on cla.codigo_siaf = em.id_clasificador
-          where certificado is not null AND ec.ano_eje::double precision = ec.anio_modificacion and ec.ano_eje= __ANIO_EJECUCION__
+          where certificado is not null AND ec.ano_eje::double precision = ec.anio_modificacion and ec.ano_eje= __ANIO_EJECUCION__::INTEGER
   - table: sistema_informacion_gerencial.hechos_pim
     partitioned: false
     query: |
