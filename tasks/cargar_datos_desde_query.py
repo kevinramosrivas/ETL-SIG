@@ -18,7 +18,8 @@ def cargar_datos_desde_query(
     sql_query: str,
     field_map: Optional[Dict[str, str]] = None,
     filter_fn: Optional[Callable[[Dict[str, Any]], bool]] = None,
-    truncate: bool = True
+    truncate: bool = True,
+    particionada: bool = True
 ) -> bool:
     logger = get_run_logger()
     logger.info(f"Iniciando transformacion y carga en tabla destino: {name_table_target}")
@@ -48,28 +49,27 @@ def cargar_datos_desde_query(
                 tmp_path = tmp.name
 
             logger.info(f"{count} registros escritos en temporal: {tmp_path}")
-
+         
             if truncate:
-                cursor.execute(f"TRUNCATE TABLE {name_table_target}_{anio} RESTART IDENTITY CASCADE;")
-                cursor.execute(f"ALTER TABLE {name_table_target}_{anio} DISABLE TRIGGER ALL;")
-                logger.info(f"Triggers deshabilitados en '{name_table_target}_{anio}'.")
-
+                cursor.execute(f"TRUNCATE TABLE {name_table_target}{f'_{anio}' if particionada else ''} RESTART IDENTITY CASCADE;")
+                cursor.execute(f"ALTER TABLE {name_table_target}{f'_{anio}' if particionada else ''} DISABLE TRIGGER ALL;")
+                logger.info(f"Triggers deshabilitados en '{name_table_target}{f'_{anio}' if particionada else ''}'.")
 
             with open(tmp_path, "r", encoding="utf-8") as f:
                 cols_sql = ", ".join(columns)
                 copy_sql = (
-                    f"COPY {name_table_target}_{anio} ({cols_sql}) "
+                    f"COPY {name_table_target}{f'_{anio}' if particionada else ''} ({cols_sql}) "
                     "FROM STDIN WITH (FORMAT csv, HEADER TRUE, NULL '\\N');"
                 )
                 cursor.copy_expert(copy_sql, f)
-                logger.info(f"COPY ejecutado en tabla '{name_table_target}'.")
+                logger.info(f"COPY ejecutado en tabla '{name_table_target}{f'_{anio}' if particionada else ''}'.")
 
             if truncate:
-                cursor.execute(f"ALTER TABLE {name_table_target}_{anio} ENABLE TRIGGER ALL;")
-                logger.info(f"Triggers reactivados en tabla '{name_table_target}_{anio}'.")
+                cursor.execute(f"ALTER TABLE {name_table_target}{f'_{anio}' if particionada else ''} ENABLE TRIGGER ALL;")
+                logger.info(f"Triggers reactivados en tabla '{name_table_target}{f'_{anio}' if particionada else ''}'.")
             conn.commit()
         except (Exception) as e:
-            logger.error(f"Error durante la transaccion para transformacion y carga '{name_table_target}'. Revirtiendo cambios (rollback)...")
+            logger.error(f"Error durante la transaccion para transformacion y carga '{name_table_target}{f'_{anio}' if particionada else ''}'. Revirtiendo cambios (rollback)...")
             logger.error(e)
             conn.rollback()
             raise e

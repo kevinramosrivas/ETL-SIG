@@ -70,6 +70,7 @@ tables:
       from bytsscom_bytcore.clasificador
       where id_nivel = 2
 
+
   - table: sistema_informacion_gerencial.hechos_institucional_consolidados
     partitioned: true
     query: |
@@ -111,7 +112,6 @@ tables:
         WHERE
             cc.ano_eje = __ANIO_EJECUCION__::varchar
         
-
 
   - table: sistema_informacion_gerencial.dm_certificado
     partitioned: true
@@ -202,6 +202,7 @@ tables:
               on mis.id_meta_institucional = mp.id_meta_institucional
         WHERE cc.ano_eje = __ANIO_EJECUCION__::varchar
 
+
   - table: sistema_informacion_gerencial.dm_expediente
     partitioned: true
     query: |
@@ -236,11 +237,17 @@ tables:
                   es.expediente,
                   ciclo,
                   fase
-              )
+                  ),
+            areas_certificado as (
+                select
+                anio,
+                cod_siaf_area,num_certificado
+                from sistema_informacion_gerencial.hechos_institucional_consolidados
+                 )   
               select
                   ec.ano_eje as ano_eje,
                   ec.sec_ejec,
-                  ec.sec_area as area_siaf,
+                  coalesce(ac.cod_siaf_area,'0000') as area_siaf,
                   ec.expediente ,
                   ec.fase,
                   ec.secuencia,
@@ -271,7 +278,12 @@ tables:
                   and em.ciclo = 'G' and em.fase = 'D'
               left join expediente_generica cla
                       on cla.codigo_siaf = em.id_clasificador
-          where certificado is not null AND ec.ano_eje::double precision = ec.anio_modificacion and ec.ano_eje= __ANIO_EJECUCION__::INTEGER
+              left join areas_certificado ac
+              on ac.anio = ec.ano_eje::integer
+              and ac.num_certificado = ef.certificado
+        where certificado is not null AND ec.ano_eje::double precision = ec.anio_modificacion and ec.ano_eje= __ANIO_EJECUCION__::VARCHAR
+
+
   - table: sistema_informacion_gerencial.hechos_pim
     partitioned: false
     query: |
