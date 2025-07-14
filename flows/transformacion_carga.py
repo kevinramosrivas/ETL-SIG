@@ -5,7 +5,7 @@ from config.utils.load_tables_config import get_years_to_extract,load_table_tran
 
 
 @flow(name="ETL-SIG:Transformacion_carga")
-def trasnformacion_carga() -> None:
+def transformacion_carga() -> None:
     logger = get_run_logger()
     for anio in get_years_to_extract():
         logger.info(f"Iniciando actualizacion de particion del anio {anio}")

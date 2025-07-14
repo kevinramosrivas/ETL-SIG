@@ -71,4 +71,6 @@ def carga_masiva_desde_dbf(
                 os.remove(tmp_path)
             elapsed = round(time.time() - start_time, 2)
             logger.info(f"bulk_load completado: {count} registros en {elapsed}s.")
+            cursor.close()
+            conn.close()
             return True

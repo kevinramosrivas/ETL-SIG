@@ -78,4 +78,6 @@ def cargar_datos_desde_query(
                 os.remove(tmp_path)
             elapsed = round(time.time() - start_time, 2)
             logger.info(f"load_data_table completado: {count} registros en {elapsed}s.")
+            cursor.close()
+            conn.close()
             return True
