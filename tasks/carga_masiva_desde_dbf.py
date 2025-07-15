@@ -21,11 +21,11 @@ def carga_masiva_desde_dbf(
     logger = get_run_logger()
     logger.info(f"Iniciando bulk_load en tabla '{table}'. Truncate={truncate}.")
     start_time = time.time()
+    count = 0
+    tmp_path = None
 
     with conectar_bd(autocommit=False) as (conn,cursor):
         try:
-            # Crear CSV temporal
-            count = 0
             with tempfile.NamedTemporaryFile(
                 mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
             ) as tmp:

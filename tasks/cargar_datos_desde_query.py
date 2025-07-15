@@ -25,9 +25,9 @@ def cargar_datos_desde_query(
     logger.info(f"Iniciando transformacion y carga en tabla destino: {name_table_target}")
     start_time = time.time()
     count = 0
+    tmp_path = None
 
     with conectar_bd(autocommit=False) as (conn,cursor):
-        tmp_path = None
         try:
             logger.info("Ejecutando consulta SQL...")
             cursor.execute(sql_query)

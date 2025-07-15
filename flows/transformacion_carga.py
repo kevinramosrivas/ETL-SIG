@@ -17,10 +17,9 @@ def transformacion_carga() -> None:
 
             if table_cfg.partitioned:
                 # Ejecutar creación de partición y esperar antes de seguir con la carga
-                crear_particiones \
+                tarea_crear_particiones = crear_particiones \
                     .with_options(name=f"CREAR-PARTICION-{tabla}-{anio}") \
-                    .submit(nombre_tabla=tabla, anio=anio) \
-                    .result()  # bloquea hasta que termine
+                    .submit(nombre_tabla=tabla, anio=anio)
 
                 # Luego hacer la carga
                 cargar_datos_desde_query \
@@ -30,6 +29,7 @@ def transformacion_carga() -> None:
                         name_table_target=tabla,
                         sql_query=table_cfg.query,
                         particionada=True,
+                        wait_for=[tarea_crear_particiones]
                     ) \
                     .result()  # espera también la carga, útil para detectar fallos
 
