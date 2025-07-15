@@ -33,12 +33,14 @@ def conectar_bd(
 
         # Crear cursor que devuelve dicts
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
+        cursor.execute("SET lc_messages TO 'C';")
+        cursor.execute("SET client_encoding TO 'UTF8';")
         yield conn, cursor
 
     except psycopg2.Error as db_err:
         # Capturamos errores de conexión o de psycopg2
-        raise RuntimeError(f"Error en la conexion a BD: {db_err}") from db_err
+        msg = str(db_err).encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+        raise RuntimeError(f"Error en la conexion a BD:\n{msg}") from db_err
 
     finally:
         # Cerramos cursor y conexión de forma segura

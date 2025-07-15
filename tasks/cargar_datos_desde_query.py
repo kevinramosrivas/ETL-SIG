@@ -24,14 +24,14 @@ def cargar_datos_desde_query(
     logger = get_run_logger()
     logger.info(f"Iniciando transformacion y carga en tabla destino: {name_table_target}")
     start_time = time.time()
-
+    count = 0
+    tmp_path = None
 
     with conectar_bd(autocommit=False) as (conn,cursor):
         try:
             logger.info("Ejecutando consulta SQL...")
             cursor.execute(sql_query)
             columns = [desc[0] for desc in cursor.description]
-            count = 0
             with tempfile.NamedTemporaryFile(
                 mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
             ) as tmp:
@@ -69,9 +69,10 @@ def cargar_datos_desde_query(
                 logger.info(f"Triggers reactivados en tabla '{name_table_target}{f'_{anio}' if particionada else ''}'.")
             conn.commit()
         except (Exception) as e:
-            logger.error(f"Error durante la transaccion para transformacion y carga '{name_table_target}{f'_{anio}' if particionada else ''}'. Revirtiendo cambios (rollback)...")
-            logger.error(e)
             conn.rollback()
+            cursor.close()
+            conn.close()
+            logger.error(f"Error durante la transaccion para transformacion y carga '{name_table_target}{f'_{anio}' if particionada else ''}'. Revirtiendo cambios (rollback)...")
             raise e
         finally:
             if tmp_path and os.path.exists(tmp_path):
@@ -80,4 +81,5 @@ def cargar_datos_desde_query(
             logger.info(f"load_data_table completado: {count} registros en {elapsed}s.")
             cursor.close()
             conn.close()
-            return True
+            
+        return True
