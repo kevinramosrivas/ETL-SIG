@@ -63,8 +63,10 @@ def carga_masiva_desde_dbf(
                 logger.info(f"Triggers reactivados en tabla '{table}'.")
             conn.commit()
         except (Exception) as e:
-            logger.error(f"Error durante la transaccion para '{table}'. Revirtiendo cambios (rollback)...")
             conn.rollback()
+            cursor.close()
+            conn.close()
+            logger.error(f"Error durante la transaccion para '{table}'. Revirtiendo cambios (rollback)...")
             raise e
         finally:
             if tmp_path and os.path.exists(tmp_path):
