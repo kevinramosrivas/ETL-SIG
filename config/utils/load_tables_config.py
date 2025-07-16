@@ -1,9 +1,32 @@
 import datetime
-from typing import List
+from typing import Any, List
+
+from pydantic import ValidationError
 from config.models.extract_model import ExtraTableSettings 
 from config.models.transform_model import TransformTablesConfig
 from pathlib import Path
 import yaml
+
+def _replace_placeholder(obj: Any, placeholder: str, value: str) -> Any:
+    """
+    Recursivamente reemplaza placeholder en cualquier str dentro de obj.
+    - Si es str, lo reemplaza.
+    - Si es list, recorre cada elemento.
+    - Si es dict, recorre cada clave/valor.
+    - En otro caso, lo devuelve tal cual.
+    """
+    if isinstance(obj, str):
+        return obj.replace(placeholder, value)
+    elif isinstance(obj, list):
+        return [_replace_placeholder(v, placeholder, value) for v in obj]
+    elif isinstance(obj, dict):
+        return {
+            k: _replace_placeholder(v, placeholder, value)
+            for k, v in obj.items()
+        }
+    else:
+        return obj
+    
 
 
 def get_years_to_extract(n=1):
@@ -33,13 +56,24 @@ def load_table_configs(path: str = "extract_config.yaml") -> ExtraTableSettings:
     return ExtraTableSettings(**raw_config)
 
 
-def load_table_tranform(year:str ,path: str = "transform_config.yaml") -> TransformTablesConfig:
+
+def load_table_tranform(year: str, path: str = "transform_config.yaml") -> TransformTablesConfig:
+    """
+    Carga la configuración de transformación desde un YAML, reemplaza
+    cualquier ocurrencia de __ANIO_EJECUCION__ con `year` en todo el dict,
+    y valida contra el modelo Pydantic.
+    """
     full_path = Path(__file__).parent.parent / path
+
     with open(full_path, "r", encoding="utf-8") as f:
-        raw_config = yaml.safe_load(f)
-    for table in raw_config.get("tables", []):
-        query:str = table.get("query","")
-        if "__ANIO_EJECUCION__" in query:
-            table["query"] = query.replace("__ANIO_EJECUCION__",year)
-    return TransformTablesConfig(**raw_config)
+        raw = yaml.safe_load(f)
+    # Aplica el reemplazo recursivo en todo el dict
+    raw_replaced = _replace_placeholder(raw, "__ANIO_EJECUCION__", year)
+
+    try:
+        config = TransformTablesConfig(**raw_replaced)
+    except ValidationError as exc:
+        raise RuntimeError(f"Error validando transform_config.yaml:\n{exc}") from exc
+
+    return config
     

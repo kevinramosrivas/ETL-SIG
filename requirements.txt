@@ -2,3 +2,6 @@ dbfread2
 psycopg2
 python-dotenv
 prefect
+beautifulsoup4
+pandas
+openpyxl

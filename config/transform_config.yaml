@@ -1,6 +1,7 @@
 tables:
   - table: sistema_informacion_gerencial.dm_area
     partitioned: false
+    source_type: sql
     query: |
       select
           id_area,
@@ -52,6 +53,7 @@ tables:
 
   - table: sistema_informacion_gerencial.dm_fuente
     partitioned: false
+    source_type: sql
     query: |
       select
           siaf_codigo as fuente_siaf,
@@ -62,6 +64,7 @@ tables:
 
   - table: sistema_informacion_gerencial.dm_generica
     partitioned: false
+    source_type: sql
     query: |
       select
         id_clasificador as id_generica,
@@ -73,6 +76,7 @@ tables:
 
   - table: sistema_informacion_gerencial.hechos_institucional_consolidados
     partitioned: true
+    source_type: sql
     query: |
         with certificado_anio_area as (
             select distinct
@@ -115,6 +119,7 @@ tables:
 
   - table: sistema_informacion_gerencial.dm_certificado
     partitioned: true
+    source_type: sql
     query: |
       with certificado_anio_area as (
               select distinct
@@ -205,6 +210,7 @@ tables:
 
   - table: sistema_informacion_gerencial.dm_expediente
     partitioned: true
+    source_type: sql
     query: |
       with expediente_generica as (
                   SELECT distinct
@@ -283,24 +289,9 @@ tables:
               and ac.num_certificado = ef.certificado
         where certificado is not null AND ec.ano_eje::double precision = ec.anio_modificacion and ec.ano_eje= __ANIO_EJECUCION__::VARCHAR
 
-
   - table: sistema_informacion_gerencial.hechos_pim
     partitioned: false
-    query: |
-      SELECT
-          id_periodo_pla,
-          f.id_fuente,
-          f.siaf_codigo as fuente_siaf,
-          p.id_area,
-          cod_siaf_area,
-          c.id_clasificador as id_generica,
-          c.nomb_clasif as generica,
-          monto_pia,
-          monto_pim
-          from bytsscom_bytpoa.vw_pim p
-      inner join bytsscom_bytcore.area a
-          on p.id_area = a.id_area
-      inner join bytsscom_bytcore.clasificador c
-      on c.id_clasificador = p.id_clasificador
-      inner join bytsscom_bytcore.fuente f
-      on f.id_fuente = p.id_fuente;      
+    source_type: scraper
+    scraper:
+      module: tasks.scrapers
+      function: scrape_and_load_pim

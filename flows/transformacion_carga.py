@@ -1,6 +1,8 @@
+from importlib import import_module
 from prefect import flow, get_run_logger
 from tasks.crear_particiones import crear_particiones
 from tasks.cargar_datos_desde_query import cargar_datos_desde_query
+from tasks.cargar_datos_desde_dataframe import cargar_datos_desde_dataframe
 from config.utils.load_tables_config import get_years_to_extract, load_table_tranform
 
 @flow(name="ETL-SIG:Transformacion_carga")
@@ -12,39 +14,64 @@ def transformacion_carga() -> None:
         logger.info(f"Iniciando anualidad: {anio}")
         config = load_table_tranform(anio)
 
-        for table_cfg in config.tables:
-            tabla = table_cfg.table
-
-            if table_cfg.partitioned:
-                # Ejecutar creación de partición y esperar antes de seguir con la carga
-                tarea_crear_particiones = crear_particiones \
-                    .with_options(name=f"CREAR-PARTICION-{tabla}-{anio}") \
-                    .submit(nombre_tabla=tabla, anio=anio)
-
-                # Luego hacer la carga
-                cargar_datos_desde_query \
-                    .with_options(name=f"CARGA-PARTICION-{tabla}-{anio}") \
-                    .submit(
-                        anio=anio,
-                        name_table_target=tabla,
-                        sql_query=table_cfg.query,
-                        particionada=True,
-                        wait_for=[tarea_crear_particiones]
-                    ) \
-                    .result()  # espera también la carga, útil para detectar fallos
-
-            else:
-                if tabla not in cargadas_no_particionadas:
-                    logger.info(f"Cargando unica vez (no particionada): {tabla}")
-                    cargar_datos_desde_query \
-                        .with_options(name=f"CARGA-TABLA-{tabla}") \
+        for tcfg in config.tables:
+            tabla = tcfg.table
+            if tcfg.source_type == "sql":
+                # --- RUTINA SQL (igual que antes) ---
+                if tcfg.partitioned:
+                    # Crear partición
+                    crear = crear_particiones \
+                        .with_options(name=f"CREAR-PARTICION-{tabla}-{anio}") \
+                        .submit(nombre_tabla=tabla, anio=anio)
+                    # Cargar con dependencia
+                    carga = cargar_datos_desde_query \
+                        .with_options(name=f"CARGA-PARTICION-{tabla}-{anio}") \
                         .submit(
                             anio=anio,
                             name_table_target=tabla,
-                            sql_query=table_cfg.query,
-                            particionada=False,
-                        ) \
-                        .result()
-                    cargadas_no_particionadas.add(tabla)
+                            sql_query=tcfg.query,
+                            particionada=True,
+                            wait_for=[crear],
+                        )
+                    carga.result()
+                else:
+                    if tabla not in cargadas_no_particionadas:
+                        carga = cargar_datos_desde_query \
+                            .with_options(name=f"CARGA-TABLA-{tabla}") \
+                            .submit(
+                                anio=anio,
+                                name_table_target=tabla,
+                                sql_query=tcfg.query,
+                                particionada=False,
+                            )
+                        carga.result()
+                        cargadas_no_particionadas.add(tabla)
 
-    logger.info("Todas las tareas completaron correctamente.")
+            if tcfg.source_type == "scraper":
+                # --- RUTINA WEB‑SCRAPING ---
+                # 1) Dinámicamente importa la tarea de scraping
+                scraper_mod = import_module(tcfg.scraper.module)
+                scrape_fn   = getattr(scraper_mod, tcfg.scraper.function)
+                # Crear partición
+                crear = crear_particiones \
+                        .with_options(name=f"CREAR-PARTICION-{tabla}-{anio}") \
+                        .submit(nombre_tabla=tabla, anio=anio)
+                # 2) Ejecuta y espera el DataFrame
+                df = scrape_fn \
+                    .with_options(name=f"SCRAPE-{tabla}") \
+                    .submit(year = anio, 
+                            target_table = tabla,
+                            wait_for=[crear] 
+                    )
+                cargar_datos_desde_dataframe\
+                    .with_options(name=f"CARGA-TABLA-{tabla}")\
+                    .submit(
+                        anio = anio,
+                        table = tabla,
+                        df = df,
+                        wait_for=[df]
+                    ).result()
+            else:
+                logger.error(f"Tipo de origen desconocido para {tabla}: {tcfg.source_type}")
+
+    logger.info("✅ Todas las tareas completaron correctamente.")
