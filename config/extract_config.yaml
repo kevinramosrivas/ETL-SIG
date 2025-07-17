@@ -383,3 +383,21 @@ tables:
       IND_PROCESO: IND_PROCES
       ID_CLASIFICADOR: ID_CLASIFI
       ESTADO_ENVIO: ESTADO_ENV
+
+  - key: acumulado_presupuestal
+    source: ACUMULADO_PRESUPUESTAL.DBF
+    target: bytsscom_bytsiaf.acumulado_presupuestal
+    columns:
+      - ANO_EJE
+      - SEC_EJEC
+      - ORIGEN
+      - FUENTE_FIN
+      - CATEGORIA
+      - TIPO_TRANS
+      - GENERICA
+      - PIA
+      - MODIFICACION
+    field_map:
+      CATEGORIA: CATEGORIA_
+      MODIFICACION: MODIFICACI
+      

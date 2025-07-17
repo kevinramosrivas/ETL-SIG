@@ -47,7 +47,7 @@ def transformacion_carga() -> None:
                         carga.result()
                         cargadas_no_particionadas.add(tabla)
 
-            if tcfg.source_type == "scraper":
+            elif tcfg.source_type == "scraper":
                 # --- RUTINA WEB‑SCRAPING ---
                 # 1) Dinámicamente importa la tarea de scraping
                 scraper_mod = import_module(tcfg.scraper.module)

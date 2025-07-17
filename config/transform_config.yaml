@@ -5,13 +5,15 @@ tables:
     query: |
       select
           id_area,
-          area_name,
-          cod_siaf_area,
-          area_display_name,
+          area_name as cod_area,
+          cod_siaf_area as area_siaf,
+          area_siaf.desc_area,
           2 as nivel,
           case id_parent_area when 10468 then 10468
-              else 11327 end as idsuperior
+              else 11327 end as id_superior
       from bytsscom_bytcore.area
+      inner join bytsscom_bytcore.area_siaf
+          on area_siaf.cod_area = area.cod_siaf_area
       where length(area_name) = 3 and cod_siaf_area not in ('0000', '0001')
       union
       select
@@ -28,28 +30,27 @@ tables:
       union
       select
           10000 as id_area,
-          '000' as area_name,
+          '000' as cod_area,
           '0000' as cod_siaf_area,
-          'UNMSM' as area_display_name,
+          'UNMSM' as desc_area,
           0 as nivel,
-          null as idsuperior
+          null as id_superior
       union
       select
           11327 as id_area,
-          'D65' as area_name,
-          '0001' as cod_siaf_area,
-          'ADMINISTRACION CENTRAL' as area_display_name,
+          'D65' as cod_area,
+          '0001' as area_siaf,
+          'ADMINISTRACION CENTRAL' as desc_area,
           1 as nivel,
-          10000 as idsuperior
+          10000 as id_superior
       union
       select
           10468 as id_area,
-          'F' as area_name,
-          '1000' as cod_siaf_area,
-          'FACULTADES' as area_display_name,
+          'F' as cod_area,
+          '1000' as area_siaf,
+          'FACULTADES' as desc_area,
           1 as nivel,
-          10000 as idsuperior;
-
+          10000 as id_superior;
 
   - table: sistema_informacion_gerencial.dm_fuente
     partitioned: false
@@ -59,20 +60,18 @@ tables:
           siaf_codigo as fuente_siaf,
           upper(desc_fuente) as desc_fuente
       from bytsscom_bytcore.fuente
-      where esta_fuente = '1' and id_fuente < 6
-
+      where esta_fuente = '1' and id_fuente <= 6
 
   - table: sistema_informacion_gerencial.dm_generica
     partitioned: false
     source_type: sql
     query: |
-      select
-        id_clasificador as id_generica,
-        cod_clasif as cod_generica,
-        nomb_clasif as nomb_generica
-      from bytsscom_bytcore.clasificador
-      where id_nivel = 2
-
+        select
+            id_clasificador as id_generica,
+            cod_clasif as generica_siaf,
+            nomb_clasif as desc_generica
+        from bytsscom_bytcore.clasificador
+        where id_nivel = 2
 
   - table: sistema_informacion_gerencial.hechos_institucional_consolidados
     partitioned: true
@@ -98,30 +97,26 @@ tables:
                 sec_ejec,
                 certificado,
                 sum(monto_nacional) as monto_detalle
-                from
-            bytsscom_bytsiaf.certificado_secuencia
+            from bytsscom_bytsiaf.certificado_secuencia
             where cod_doc in ('086','000')
             group by ano_eje, sec_ejec, certificado
         )
-        SELECT
+            select
             cc.ano_eje as anio,
             cc.certificado as num_certificado,
-            coalesce(caa.cod_siaf_area, '0000') as cod_siaf_area,
+            coalesce(caa.cod_siaf_area, '0000') as area_siaf,
             cc.monto_detalle as monto
-            from
-        certificado_consolidado cc
-        left join certificado_anio_area caa
-            on cc.certificado = caa.siaf_certificado
-            and cc.ano_eje = caa.ano_eje
-        WHERE
-            cc.ano_eje = __ANIO_EJECUCION__::varchar
+            from certificado_consolidado cc
+            left join certificado_anio_area caa
+                on cc.certificado = caa.siaf_certificado
+                and cc.ano_eje = caa.ano_eje
+            WHERE cc.ano_eje = __ANIO_EJECUCION__::varchar
         
-
   - table: sistema_informacion_gerencial.dm_certificado
     partitioned: true
     source_type: sql
     query: |
-      with certificado_anio_area as (
+        with certificado_anio_area as (
               select distinct
                   c.siaf_certificado,
                   cert.ano_eje,
@@ -130,50 +125,62 @@ tables:
               inner join bytsscom_bytsig.memo_requerimiento m
                   on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
               inner join bytsscom_bytsiaf.certificado cert
-                  on c.id_anio::varchar = cert.ano_eje and c.siaf_certificado = cert.certificado
+                  on c.id_anio= cert.ano_eje::int and c.siaf_certificado = cert.certificado
               inner join bytsscom_bytcore.area a
                   on a.id_area = m.id_area
               where c.esta_cert = 'A' and tipo_cert = 'DP'
           ),
-      certificado_consolidado as (
+        certificado_consolidado as (
           select
-              ano_eje,
-              sec_ejec,
-              certificado,
-              secuencia,
-              correlativo,
+              cc.ano_eje,
+              cc.sec_ejec,
+              cc.certificado,
+              cc.secuencia,
+              cc.correlativo,
               cod_doc,
               num_doc,
-              estado_envio,
-              estado_registro,
+              cc.estado_envio,
+              cc.estado_registro,
               fecha_creacion_clt,
-              sum(monto_nacional) as monto_detalle
-              from
-          bytsscom_bytsiaf.certificado_secuencia
+              cf.glosa,
+              cf.fuente_financ,
+              cm.sec_func,
+              cm.id_clasificador as idclasificador_siaf,
+              sum(cm.monto_nacional) as monto_detalle
+          from bytsscom_bytsiaf.certificado_secuencia cc
+          inner join bytsscom_bytsiaf.certificado_fase cf
+            on cc.certificado = cf.certificado
+            and cc.ano_eje = cf.ano_eje
+            and cc.secuencia = cf.secuencia
+          inner join bytsscom_bytsiaf.certificado_meta cm
+            on cc.certificado = cm.certificado
+            and cc.ano_eje = cm.ano_eje
+            and cc.secuencia = cm.secuencia
+            and cc.correlativo = cm.correlativo
           where cod_doc in ('086','000')
-          group by ano_eje, sec_ejec, certificado,secuencia,correlativo
+          group by cc.ano_eje, cc.sec_ejec, cc.certificado,cc.secuencia,cc.correlativo,cf.glosa,cf.fuente_financ,cm.id_clasificador,cm.sec_func
           ),
-      fuentes as(
+        fuentes as(
           select
               id_fuente,
               siaf_codigo,
               upper(desc_fuente) as desc_fuente
           from bytsscom_bytcore.fuente
-              where esta_fuente = '1' and id_fuente < 6
-      )
+              where esta_fuente = '1' and id_fuente <= 6
+        )
         SELECT
-          cc.ano_eje,
+          cc.ano_eje as anio,
           cc.certificado as num_certificado,
-          coalesce(caa.cod_siaf_area, '0000') as cod_siaf_area,
+          coalesce(caa.cod_siaf_area, '0000') as area_siaf,
           cc.secuencia,
-          cc.sec_ejec,
-          cm.monto_nacional as monto_clasificador,
-          f.siaf_codigo as siaf_id_fuente,
-          cf.glosa,
+          cc.sec_ejec as ejecutora,
+          cc.monto_detalle as monto_clasificador,
+          f.siaf_codigo as fuente_siaf,
+          cc.glosa,
           cc.correlativo,
-          cm.id_clasificador as siaf_id_clasificador,
+          cc.idclasificador_siaf as idclasificador_siaf,
           cla.cod_clasif AS clasificador,
-          SUBSTRING(cla.cod_clasif, 1, 2) AS generica,
+          SUBSTRING(cla.cod_clasif, 1, 2) AS generica_siaf,
           cc.cod_doc,
           cc.num_doc,
           cc.estado_envio,
@@ -182,32 +189,21 @@ tables:
           mis.id_meta_institucional as idmeta,
           mis.sec_func as codmeta,
           mp.nomb_met_ins
-          from
-      certificado_consolidado cc
-      left join certificado_anio_area caa
-          on cc.certificado = caa.siaf_certificado
-          and cc.ano_eje = caa.ano_eje
-      inner join bytsscom_bytsiaf.certificado_fase cf
-          on cc.certificado = cf.certificado
-          and cc.ano_eje = cf.ano_eje
-          and cc.secuencia = cf.secuencia
-      inner join fuentes f
-              on TRIM(cf.fuente_financ) = f.siaf_codigo
-      inner join bytsscom_bytsiaf.certificado_meta cm
-              on cc.certificado = cm.certificado
-              and cc.ano_eje = cm.ano_eje
-              and cc.secuencia = cm.secuencia
-              and cc.correlativo = cm.correlativo
-      inner join bytsscom_bytcore.clasificador cla
-              on cla.codigo_siaf = cm.id_clasificador
-              and cla.activo_clasif = 1
-      left join bytsscom_bytcore.meta_institucional_siaf mis
-              on cm.sec_func = mis.sec_func and cm.ano_eje = mis.id_anio::varchar
-          inner join bytsscom_bytcore.meta_institucional mp
-              on mis.id_meta_institucional = mp.id_meta_institucional
-        WHERE cc.ano_eje = __ANIO_EJECUCION__::varchar
-
-
+        from certificado_consolidado cc
+        left join certificado_anio_area caa
+            on cc.certificado = caa.siaf_certificado
+            and cc.ano_eje = caa.ano_eje
+        inner join fuentes f
+            on TRIM(cc.fuente_financ) = f.siaf_codigo
+        inner join bytsscom_bytcore.clasificador cla
+            on cla.codigo_siaf = cc.idclasificador_siaf
+            and cla.activo_clasif = 1
+        left join bytsscom_bytcore.meta_institucional_siaf mis
+            on cc.sec_func = mis.sec_func and cc.ano_eje::integer = mis.id_anio
+        inner join bytsscom_bytcore.meta_institucional mp
+            on mis.id_meta_institucional = mp.id_meta_institucional
+        WHERE cc.ano_eje::integer = __ANIO_EJECUCION__
+  
   - table: sistema_informacion_gerencial.dm_expediente
     partitioned: true
     source_type: sql
@@ -247,13 +243,13 @@ tables:
             areas_certificado as (
                 select
                 anio,
-                cod_siaf_area,num_certificado
+                area_siaf,num_certificado
                 from sistema_informacion_gerencial.hechos_institucional_consolidados
                  )   
               select
-                  ec.ano_eje as ano_eje,
-                  ec.sec_ejec,
-                  coalesce(ac.cod_siaf_area,'0000') as area_siaf,
+                  ec.ano_eje as anio,
+                  ec.sec_ejec as ejecutora,
+                  coalesce(ac.area_siaf,'0000') as area_siaf,
                   ec.expediente ,
                   ec.fase,
                   ec.secuencia,
@@ -264,12 +260,12 @@ tables:
                   ec.fecha_autorizacion,
                   ef.fuente_financ as fuente_siaf,
                   cla.cod_clasif AS clasificador,
-                  SUBSTRING(cla.cod_clasif, 1, 2) AS generica,
-                  em.monto_nacional,
+                  SUBSTRING(cla.cod_clasif, 1, 2) AS generica_siaf,
+                  sum(em.monto_nacional) as monto_nacional,
                   ec.cod_doc,
                   ec.num_doc,
                   em.estado_envio,
-                  em.id_clasificador as siaf_id_clasificador
+                  em.id_clasificador as idclasificador_siaf
               from  expediente_consolidado ec
               inner join bytsscom_bytsiaf.expediente_fase ef
                   on ec.ano_eje = ef.ano_eje
@@ -288,6 +284,7 @@ tables:
               on ac.anio = ec.ano_eje::integer
               and ac.num_certificado = ef.certificado
         where certificado is not null AND ec.ano_eje::double precision = ec.anio_modificacion and ec.ano_eje= __ANIO_EJECUCION__::VARCHAR
+        group by ec.ano_eje,ec.sec_ejec,ac.area_siaf,ec.expediente,ec.fase,ec.secuencia,ec.correlativo,ec.ciclo,ef.certificado,ef.certificado_secuencia,ec.fecha_autorizacion,ef.fuente_financ,cla.cod_clasif,SUBSTRING(cla.cod_clasif, 1, 2),ec.cod_doc,ec.num_doc,em.estado_envio,em.id_clasificador
 
   - table: sistema_informacion_gerencial.hechos_pim
     partitioned: false
@@ -295,3 +292,26 @@ tables:
     scraper:
       module: tasks.scrapers
       function: scrape_and_load_pim
+      
+  - table: sistema_informacion_gerencial.dm_pim
+    partitioned: false
+    source_type: sql
+    query: |
+        SELECT
+            id_periodo_pla as anio,
+            f.id_fuente,
+            f.siaf_codigo as fuente_siaf,
+            p.id_area,
+            cod_siaf_area area_siaf,
+            c.id_clasificador as id_generica,
+            SUBSTRING(c.cod_clasif, 1, 2) AS generica_siaf,
+            monto_pia,
+            monto_pim
+        from bytsscom_bytpoa.vw_pim p
+        inner join bytsscom_bytcore.area a
+            on p.id_area = a.id_area
+        inner join bytsscom_bytcore.clasificador c
+            on c.id_clasificador = p.id_clasificador
+        inner join bytsscom_bytcore.fuente f
+            on f.id_fuente = p.id_fuente
+        where not(monto_pia = 0 and monto_pim = 0) and not (id_periodo_pla=2025 and siaf_codigo = '00' and SUBSTRING(c.cod_clasif, 1, 2) ='24');
