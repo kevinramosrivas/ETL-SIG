@@ -13,7 +13,7 @@ def cargar_datos_desde_dataframe(
     anio: str,
     table: str,
     df: pd.DataFrame,
-    truncate: bool = False,
+    truncate: bool = True,
     particionada: bool = True
 ) -> bool:
     """

@@ -10,7 +10,7 @@ class TransformTableConfig(BaseModel):
     table: str
     partitioned: bool
     source_type: Literal["sql", "scraper"]
-
+    table_type: Literal["dimension", "fact"] = "dimension"  # Nuevo campo opcional con valor por defecto
     # Campos opcionales según source_type
     query: Optional[str] = None
     scraper: Optional[ScraperConfig] = None
