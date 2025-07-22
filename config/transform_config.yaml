@@ -323,7 +323,7 @@ tables:
             and ef.fuente_financ != '88'
         left join clasificador c
             on c.codigo_siaf = em.id_clasificador
-        WHERE es.ciclo = 'G' and es.fase = 'D' and es.estado_ctb = 'S' and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
+        WHERE es.ciclo = 'G' and es.fase = 'D' and (certificado is not null) and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
 
   - table: sistema_informacion_gerencial.hechos_pim
     partitioned: false
