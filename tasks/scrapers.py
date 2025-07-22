@@ -17,7 +17,7 @@ HEADERS = {
     'Referer': URL_BASE
 }
 # Mapeo de código de fuente a valor real
-FUENTES_MAP = {'1': '00', '2': '09', '4': '13', '5': '18'}
+FUENTES_MAP = {'1': '00', '2': '09','3':'19', '4': '13', '5': '18'}
 
 
 @task(retries=2, retry_delay_seconds=10)
@@ -79,9 +79,10 @@ def scrape_and_load_pim(year: str, target_table: str) -> pd.DataFrame:
     final_df.rename(columns={'PIM': 'MONTO_PIM'}, inplace=True)
     final_df.rename(columns={'PIA': 'MONTO_PIA'}, inplace=True)
     final_df["MONTO_PIA"] = final_df["MONTO_PIA"].str.replace(',', '', regex=False)
+    final_df["MONTO_PIA"] = final_df["MONTO_PIA"].fillna(0)
     final_df["MONTO_PIM"] = final_df["MONTO_PIM"].str.replace(',', '', regex=False)
-    final_df["MONTO_PIA"] = final_df["MONTO_PIA"].astype(float)
-    final_df["MONTO_PIM"] = final_df["MONTO_PIM"].astype(float)
+    final_df["MONTO_PIM"] = final_df["MONTO_PIM"].fillna(0)
+    # Solo convierte a float si hay datos
     filtered_df = final_df[["ANIO","EJECUTORA","FUENTE_SIAF","GENERICA_SIAF","MONTO_PIA","MONTO_PIM"]]
     filtered_df = (
         filtered_df.groupby(

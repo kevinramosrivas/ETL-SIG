@@ -72,6 +72,14 @@ def transformacion_carga() -> None:
     logger = get_run_logger()
     cargadas_no_particionadas: set[str] = set()
 
+    logger.info("=== Inicio: Procesamiento de Tablas DIMENSION_BASE ===")
+    for anio in get_years_to_extract():
+        logger.info(f"Anio {anio} (DIMENSION_BASE)")
+        config_fact = load_table_tranform(anio, table_type="dimension_base")
+        for tcfg in config_fact.tables:
+            _procesar_tabla(logger, anio, tcfg, cargadas_no_particionadas)
+
+
     #Primero: todas las tablas FACT, año por año
     logger.info("=== Inicio: Procesamiento de Tablas FACT ===")
     for anio in get_years_to_extract():

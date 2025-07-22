@@ -2,7 +2,7 @@ tables:
   - table: sistema_informacion_gerencial.dm_area
     partitioned: false
     source_type: sql
-    table_type: dimension
+    table_type: dimension_base
     query: |
       select
           id_area,
@@ -56,7 +56,7 @@ tables:
   - table: sistema_informacion_gerencial.dm_fuente
     partitioned: false
     source_type: sql
-    table_type: dimension
+    table_type: dimension_base
     query: |
       select
           siaf_codigo as fuente_siaf,
@@ -67,7 +67,7 @@ tables:
   - table: sistema_informacion_gerencial.dm_generica
     partitioned: false
     source_type: sql
-    table_type: dimension
+    table_type: dimension_base
     query: |
         select
             id_clasificador as id_generica,
@@ -82,39 +82,107 @@ tables:
     table_type: fact
     query: |
         with certificado_anio_area as (
-            select distinct
-                c.siaf_certificado,
-                cert.ano_eje,
-                a.cod_siaf_area
-            from bytsscom_bytsig.vw_certificacion c
-            inner join bytsscom_bytsig.memo_requerimiento m
-                on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
-            inner join bytsscom_bytsiaf.certificado cert
-                on c.id_anio::varchar = cert.ano_eje and c.siaf_certificado = cert.certificado
-            inner join bytsscom_bytcore.area a
-                on a.id_area = m.id_area
-            where c.esta_cert = 'A' and tipo_cert = 'DP'
+              select distinct
+                  c.siaf_certificado,
+                  cert.ano_eje,
+                  a.cod_siaf_area
+              from bytsscom_bytsig.vw_certificacion c
+              inner join bytsscom_bytsig.memo_requerimiento m
+                  on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
+              inner join bytsscom_bytsiaf.certificado cert
+                  on c.id_anio= cert.ano_eje::int and c.siaf_certificado = cert.certificado
+              inner join bytsscom_bytcore.area a
+                  on a.id_area = m.id_area
+              where c.esta_cert = 'A' and tipo_cert = 'DP'
+          ),
+        clasificador as (
+              SELECT DISTINCT ON (cod_clasif, codigo_siaf)
+                cod_clasif,
+                codigo_siaf
+              FROM bytsscom_bytcore.clasificador
+              WHERE codigo_siaf is not null
+              ORDER BY cod_clasif, codigo_siaf
         ),
         certificado_consolidado as (
+              select
+                cs.ano_eje,
+                cs.ano_eje||cast(cs.certificado as int)||TRIM(cf.fuente_financ)||COALESCE(SUBSTRING(cla.cod_clasif, 1, 2),'21') as id_hecho_institucional,
+                cs.sec_ejec,
+                cs.certificado,
+                cf.fuente_financ,
+                SUBSTRING(cla.cod_clasif, 1, 2) AS generica_siaf,
+                sum(cm.monto_nacional) as monto_detalle
+              from bytsscom_bytsiaf.certificado_secuencia cs
+              inner join bytsscom_bytsiaf.certificado_fase cf
+                on cs.certificado = cf.certificado
+                and cs.ano_eje = cf.ano_eje
+                and cs.secuencia = cf.secuencia
+              inner join bytsscom_bytsiaf.certificado_meta cm
+                on cs.certificado = cm.certificado
+                and cs.ano_eje = cm.ano_eje
+                and cs.secuencia = cm.secuencia
+                and cs.correlativo = cm.correlativo
+              left join clasificador cla
+                on cm.id_clasificador = cla.codigo_siaf
+            where cod_doc in ('086','000')  and cs.ano_eje  = __ANIO_EJECUCION__::VARCHAR
+            group by cs.ano_eje, cs.sec_ejec, cs.certificado,cf.fuente_financ,SUBSTRING(cla.cod_clasif, 1, 2)
+          ),
+        fuentes as(
             select
-                ano_eje,
-                sec_ejec,
-                certificado,
-                sum(monto_nacional) as monto_detalle
-            from bytsscom_bytsiaf.certificado_secuencia
-            where cod_doc in ('086','000')
-            group by ano_eje, sec_ejec, certificado
+                id_fuente,
+                siaf_codigo,
+                upper(desc_fuente) as desc_fuente
+            from bytsscom_bytcore.fuente
+                where esta_fuente = '1' and id_fuente <= 6
+        ),
+        expediente as (
+             SELECT
+                es.ano_eje||cast(ef.certificado as int)||ef.fuente_financ||COALESCE(SUBSTRING(c.cod_clasif, 1, 2),'21') as id_hecho_institucional,
+                es.ano_eje,
+                coalesce(caa.ano_eje,'0000') as area_siaf,
+                es.sec_ejec,
+                ef.certificado,
+                ef.fuente_financ,
+                SUBSTRING(c.cod_clasif, 1, 2) AS generica_siaf,
+                sum(em.monto_nacional) AS monto_expediente
+             FROM bytsscom_bytsiaf.expediente_secuencia es
+             inner join bytsscom_bytsiaf.expediente_meta em
+                on es.expediente = em.expediente
+                and es.ano_eje = em.ano_eje
+                and es.secuencia = em.secuencia
+                and es.correlativo = em.correlativo
+                and em.ciclo = 'G' and em.fase = 'D'
+             inner join bytsscom_bytsiaf.expediente_fase ef
+                on es.ano_eje = ef.ano_eje
+                and es.expediente = ef.expediente
+                and es.secuencia = ef.secuencia
+                and ef.fuente_financ != '88'
+             left join clasificador c
+                on c.codigo_siaf = em.id_clasificador
+             left join certificado_anio_area caa
+                on caa.siaf_certificado = ef.certificado
+                and caa.ano_eje = es.ano_eje
+            WHERE es.ciclo = 'G' and es.fase = 'D' and es.estado_ctb = 'S' and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
+            group by es.ano_eje,es.sec_ejec,ef.fuente_financ,SUBSTRING(c.cod_clasif, 1, 2),caa.ano_eje,ef.certificado
         )
-            select
-            cc.ano_eje as anio,
-            cc.certificado as num_certificado,
-            coalesce(caa.cod_siaf_area, '0000') as area_siaf,
-            cc.monto_detalle as monto
+            SELECT
+                cc.id_hecho_institucional,
+                cc.ano_eje as anio,
+                cc.certificado as num_certificado,
+                coalesce(ex.monto_expediente,0) as monto_expediente,
+                coalesce(caa.cod_siaf_area, '0000') as area_siaf,
+                f.siaf_codigo as fuente_siaf,
+                cc.generica_siaf,
+                cc.monto_detalle as monto_certificado
             from certificado_consolidado cc
             left join certificado_anio_area caa
                 on cc.certificado = caa.siaf_certificado
                 and cc.ano_eje = caa.ano_eje
-            WHERE cc.ano_eje = __ANIO_EJECUCION__::varchar
+            inner join fuentes f
+                on TRIM(cc.fuente_financ) = f.siaf_codigo
+            left join expediente ex
+                on cc.id_hecho_institucional = ex.id_hecho_institucional
+            WHERE cc.ano_eje::integer = __ANIO_EJECUCION__;
         
   - table: sistema_informacion_gerencial.dm_certificado
     partitioned: true
@@ -174,6 +242,7 @@ tables:
               where esta_fuente = '1' and id_fuente <= 6
         )
         SELECT
+          cc.ano_eje||cast(cc.certificado as int)||f.siaf_codigo||COALESCE(SUBSTRING(cla.cod_clasif, 1, 2),'21') as id_hecho_institucional,
           cc.ano_eje as anio,
           cc.certificado as num_certificado,
           coalesce(caa.cod_siaf_area, '0000') as area_siaf,
@@ -214,83 +283,47 @@ tables:
     source_type: sql
     table_type: dimension
     query: |
-      with expediente_generica as (
-                  SELECT distinct
-                          c.cod_clasif AS cod_clasif,
-                          c.codigo_siaf
-                  FROM bytsscom_bytcore.clasificador c
-                  ),
-          expediente_consolidado as (
-              SELECT
-                  es.ano_eje,
-                  es.expediente,
-                  es.sec_ejec,
-                  secuencia,
-                  correlativo,
-                  ciclo,
-                  coalesce(e.sec_area,'0000') as sec_area,
-                  fase,
-                  es.cod_doc,
-                  es.num_doc,
-                  es.estado_envio,
-                  es.fecha_autorizacion,
-                  coalesce(extract(year from es.fecha_mod),es.ano_eje::double precision) as anio_modificacion,
-                  sum(monto_nacional) AS monto_nacional
-                  FROM bytsscom_bytsiaf.expediente_secuencia es
-                  left JOIN bytsscom_bytsiaf.expediente e
-                      ON es.ano_eje = e.ano_eje
-                      AND es.expediente = e.expediente
-                  WHERE ciclo = 'G' and fase = 'D'
-                  group by es.ano_eje,e.sec_area,es.sec_ejec,secuencia,correlativo,
-                  es.expediente,
-                  ciclo,
-                  fase
-                  ),
-            areas_certificado as (
-                select
-                anio,
-                area_siaf,num_certificado
-                from sistema_informacion_gerencial.hechos_institucional_consolidados
-                 )   
-              select
-                  ec.ano_eje as anio,
-                  ec.sec_ejec as ejecutora,
-                  coalesce(ac.area_siaf,'0000') as area_siaf,
-                  ec.expediente ,
-                  ec.fase,
-                  ec.secuencia,
-                  ec.correlativo,
-                  ec.ciclo,
-                  ef.certificado,
-                  ef.certificado_secuencia,
-                  ec.fecha_autorizacion,
-                  ef.fuente_financ as fuente_siaf,
-                  cla.cod_clasif AS clasificador,
-                  SUBSTRING(cla.cod_clasif, 1, 2) AS generica_siaf,
-                  sum(em.monto_nacional) as monto_nacional,
-                  ec.cod_doc,
-                  ec.num_doc,
-                  em.estado_envio,
-                  em.id_clasificador as idclasificador_siaf
-              from  expediente_consolidado ec
-              inner join bytsscom_bytsiaf.expediente_fase ef
-                  on ec.ano_eje = ef.ano_eje
-                  and ec.expediente = ef.expediente
-                  and ec.secuencia = ef.secuencia
-                  and ef.fuente_financ != '88'
-              inner join bytsscom_bytsiaf.expediente_meta em
-                  on ec.ano_eje = em.ano_eje
-                  and ec.expediente = em.expediente
-                  and ec.secuencia = em.secuencia
-                  and ec.correlativo = em.correlativo
-                  and em.ciclo = 'G' and em.fase = 'D'
-              left join expediente_generica cla
-                      on cla.codigo_siaf = em.id_clasificador
-              left join areas_certificado ac
-              on ac.anio = ec.ano_eje::integer
-              and ac.num_certificado = ef.certificado
-        where certificado is not null AND ec.ano_eje::double precision = ec.anio_modificacion and ec.ano_eje= __ANIO_EJECUCION__::VARCHAR
-        group by ec.ano_eje,ec.sec_ejec,ac.area_siaf,ec.expediente,ec.fase,ec.secuencia,ec.correlativo,ec.ciclo,ef.certificado,ef.certificado_secuencia,ec.fecha_autorizacion,ef.fuente_financ,cla.cod_clasif,SUBSTRING(cla.cod_clasif, 1, 2),ec.cod_doc,ec.num_doc,em.estado_envio,em.id_clasificador
+        with clasificador as (
+        SELECT DISTINCT ON (cod_clasif, codigo_siaf)
+            cod_clasif,
+            codigo_siaf
+        FROM bytsscom_bytcore.clasificador
+        WHERE codigo_siaf is not null
+        ORDER BY cod_clasif, codigo_siaf
+        )
+        SELECT
+            es.ano_eje||cast(ef.certificado as int)||ef.fuente_financ||COALESCE(SUBSTRING(c.cod_clasif, 1, 2),'21') as id_hecho_institucional,
+            es.ano_eje as anio,
+            es.sec_ejec as ejecutora,
+            ef.expediente,
+            ef.certificado,
+            ef.certificado_secuencia,
+            ef.fase,
+            es.secuencia,
+            es.correlativo,
+            ef.ciclo,
+            es.fecha_autorizacion,
+            em.id_clasificador as idclasificador_siaf,
+            c.cod_clasif AS clasificador,
+            em.monto_nacional AS monto_nacional,
+            es.cod_doc,
+            es.num_doc,
+            em.estado_envio
+        FROM bytsscom_bytsiaf.expediente_secuencia es
+        inner join bytsscom_bytsiaf.expediente_meta em
+            on es.expediente = em.expediente
+            and es.ano_eje = em.ano_eje
+            and es.secuencia = em.secuencia
+            and es.correlativo = em.correlativo
+            and em.ciclo = 'G' and em.fase = 'D'
+        inner join bytsscom_bytsiaf.expediente_fase ef
+            on es.ano_eje = ef.ano_eje
+            and es.expediente = ef.expediente
+            and es.secuencia = ef.secuencia
+            and ef.fuente_financ != '88'
+        left join clasificador c
+            on c.codigo_siaf = em.id_clasificador
+        WHERE es.ciclo = 'G' and es.fase = 'D' and es.estado_ctb = 'S' and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
 
   - table: sistema_informacion_gerencial.hechos_pim
     partitioned: false
