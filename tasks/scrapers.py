@@ -82,6 +82,9 @@ def scrape_and_load_pim(year: str, target_table: str) -> pd.DataFrame:
     final_df["MONTO_PIA"] = final_df["MONTO_PIA"].fillna(0)
     final_df["MONTO_PIM"] = final_df["MONTO_PIM"].str.replace(',', '', regex=False)
     final_df["MONTO_PIM"] = final_df["MONTO_PIM"].fillna(0)
+    final_df["MONTO_PIA"] = final_df["MONTO_PIA"].astype(float)
+    final_df["MONTO_PIM"] = final_df["MONTO_PIM"].astype(float)
+
     # Solo convierte a float si hay datos
     filtered_df = final_df[["ANIO","EJECUTORA","FUENTE_SIAF","GENERICA_SIAF","MONTO_PIA","MONTO_PIM"]]
     filtered_df = (

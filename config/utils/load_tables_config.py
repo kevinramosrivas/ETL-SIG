@@ -29,7 +29,7 @@ def _replace_placeholder(obj: Any, placeholder: str, value: str) -> Any:
     
 
 
-def get_years_to_extract(n=1):
+def get_years_to_extract(n=2):
     # Leer año actual desde variable, si no existe usar el año actual del sistema
     periodo_hasta = int(datetime.datetime.now().now().year)
     periodo_desde = int(datetime.datetime.now().now().year - n) 

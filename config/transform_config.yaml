@@ -143,7 +143,7 @@ tables:
                 es.sec_ejec,
                 ef.certificado,
                 ef.fuente_financ,
-                SUBSTRING(c.cod_clasif, 1, 2) AS generica_siaf,
+                coalesce(SUBSTRING(c.cod_clasif, 1, 2),'21') AS generica_siaf,
                 sum(em.monto_nacional) AS monto_expediente
              FROM bytsscom_bytsiaf.expediente_secuencia es
              inner join bytsscom_bytsiaf.expediente_meta em
@@ -162,7 +162,7 @@ tables:
              left join certificado_anio_area caa
                 on caa.siaf_certificado = ef.certificado
                 and caa.ano_eje = es.ano_eje
-            WHERE es.ciclo = 'G' and es.fase = 'D' and es.estado_ctb = 'S' and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
+            WHERE es.ciclo = 'G' and es.fase = 'D' and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
             group by es.ano_eje,es.sec_ejec,ef.fuente_financ,SUBSTRING(c.cod_clasif, 1, 2),caa.ano_eje,ef.certificado
         )
             SELECT
@@ -326,7 +326,7 @@ tables:
         WHERE es.ciclo = 'G' and es.fase = 'D' and (certificado is not null) and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
 
   - table: sistema_informacion_gerencial.hechos_pim
-    partitioned: false
+    partitioned: true
     source_type: scraper
     table_type: fact
     scraper:
