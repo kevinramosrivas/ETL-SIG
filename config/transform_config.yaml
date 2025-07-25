@@ -305,7 +305,7 @@ tables:
             es.fecha_autorizacion,
             em.id_clasificador as idclasificador_siaf,
             c.cod_clasif AS clasificador,
-            em.monto_nacional AS monto_nacional,
+            sum(em.monto_nacional) AS monto_nacional,
             es.cod_doc,
             es.num_doc,
             em.estado_envio
@@ -324,6 +324,9 @@ tables:
         left join clasificador c
             on c.codigo_siaf = em.id_clasificador
         WHERE es.ciclo = 'G' and es.fase = 'D' and (certificado is not null) and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
+        group by es.ano_eje,es.sec_ejec,ef.expediente,
+        ef.certificado,ef.certificado_secuencia,ef.fase,es.secuencia,es.correlativo,
+        ef.ciclo,es.fecha_autorizacion,em.id_clasificador,c.cod_clasif,es.cod_doc,es.num_doc,em.estado_envio,ef.fuente_financ;
 
   - table: sistema_informacion_gerencial.hechos_pim
     partitioned: true
@@ -340,14 +343,13 @@ tables:
     query: |
         SELECT
             id_periodo_pla as anio,
-            f.id_fuente,
             f.siaf_codigo as fuente_siaf,
             p.id_area,
             cod_siaf_area area_siaf,
             c.id_clasificador as id_generica,
             SUBSTRING(c.cod_clasif, 1, 2) AS generica_siaf,
-            monto_pia,
-            monto_pim
+            sum(monto_pia) as monto_pia,
+            sum(monto_pim) as monto_pim
         from bytsscom_bytpoa.vw_pim p
         inner join bytsscom_bytcore.area a
             on p.id_area = a.id_area
@@ -355,4 +357,5 @@ tables:
             on c.id_clasificador = p.id_clasificador
         inner join bytsscom_bytcore.fuente f
             on f.id_fuente = p.id_fuente
-        where not(monto_pia = 0 and monto_pim = 0) and not (id_periodo_pla=2025 and siaf_codigo = '00' and SUBSTRING(c.cod_clasif, 1, 2) ='24');
+        where not(monto_pia = 0 and monto_pim = 0) and not (id_periodo_pla=2025 and siaf_codigo = '00' and SUBSTRING(c.cod_clasif, 1, 2) ='24')
+        group by id_periodo_pla,f.siaf_codigo,p.id_area,cod_siaf_area,c.id_clasificador,SUBSTRING(c.cod_clasif, 1, 2);
