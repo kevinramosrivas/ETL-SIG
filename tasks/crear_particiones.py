@@ -33,7 +33,7 @@ def crear_particiones(nombre_tabla: str, anio: str) -> None:
         parent=sql.Identifier(tabla)
     )
 
-    with conectar_bd(autocommit=False) as (conn, cursor):
+    with conectar_bd(autocommit=True) as (conn, cursor):
         try:
             logger.info(f"Verificando existencia de particion: {esquema}.{nombre_particion}")
             cursor.execute(check_sql)
@@ -46,7 +46,6 @@ def crear_particiones(nombre_tabla: str, anio: str) -> None:
             logger.info(f"Creando particion '{esquema}.{nombre_particion}' para el ano {anio}")
             cursor.execute(create_sql, [anio])
             logger.info(f"Particion '{esquema}.{nombre_particion}' creada correctamente.")
-            conn.commit()
         except Exception as e:
             logger.error(f"Error al crear la particion: {e}")
             raise e

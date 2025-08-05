@@ -3,7 +3,10 @@ from prefect import flow, get_run_logger
 from tasks.crear_particiones import crear_particiones
 from tasks.cargar_datos_desde_query import cargar_datos_desde_query
 from tasks.cargar_datos_desde_dataframe import cargar_datos_desde_dataframe
+from tasks.actualizar_vw_materializadas import actualizar_vw_materializadas
 from config.utils.load_tables_config import get_years_to_extract, load_table_tranform
+from config.utils.load_views_config import load_views_configs
+
 
 def _procesar_tabla(
     logger,
@@ -96,4 +99,11 @@ def transformacion_carga() -> None:
         for tcfg in config_dim.tables:
             _procesar_tabla(logger, anio, tcfg, cargadas_no_particionadas)
 
+    config_vw_m = load_views_configs()
+    for vwm in config_vw_m.tables:
+        logger.info(f"Vista {vwm}")
+        actualizar_vw_materializadas \
+            .with_options(name=f"ACTUALIZAR-VISTA-{vwm}") \
+            .submit(nombre_tabla=vwm,esquema=config_vw_m.schema_name) \
+            .result()
     logger.info("Todas las tareas completaron correctamente")
