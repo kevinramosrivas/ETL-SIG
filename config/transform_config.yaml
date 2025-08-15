@@ -359,3 +359,33 @@ tables:
             on f.id_fuente = p.id_fuente
         where not(monto_pia = 0 and monto_pim = 0) and not (id_periodo_pla=2025 and siaf_codigo = '00' and SUBSTRING(c.cod_clasif, 1, 2) ='24')
         group by id_periodo_pla,f.siaf_codigo,p.id_area,cod_siaf_area,c.id_clasificador,SUBSTRING(c.cod_clasif, 1, 2);
+
+  - table: sistema_informacion_gerencial.dm_clasificador
+    partitioned: false
+    source_type: sql
+    table_type: dimension
+    query: |
+        SELECT *
+        FROM (
+        SELECT DISTINCT ON (id_clasificador)
+            id_clasificador as idclasificador_siaf,
+            tipo_transaccion || generica AS generica,
+            tipo_transaccion || generica || subgenerica || subgenerica_det || especifica || especifica_det AS clasificador,
+            descripcion
+        FROM bytsscom_bytsiaf.especifica_detalle
+        ORDER BY id_clasificador, descripcion ,ano_eje DESC
+        ) AS sub;
+
+  - table: sistema_informacion_gerencial.dm_pim_clasificador
+    partitioned: false
+    source_type: sql
+    table_type: dimension
+    query: |
+        SELECT 
+            ano_eje as anio,
+            fuente_financ as fuente_siaf,
+            tipo_transaccion || generica as generica_siaf,
+            id_clasificador as idclasificador_siaf,
+            monto_asignado as monto_pim
+        FROM bytsscom_bytsiaf.mpp_pca_x_especifica
+        WHERE ano_eje in ('2020','2021','2022','2023','2024','2025')
