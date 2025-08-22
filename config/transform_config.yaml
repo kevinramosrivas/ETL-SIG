@@ -240,6 +240,14 @@ tables:
               upper(desc_fuente) as desc_fuente
           from bytsscom_bytcore.fuente
               where esta_fuente = '1' and id_fuente <= 6
+        ),
+        clasificador as (
+              SELECT DISTINCT ON (cod_clasif, codigo_siaf)
+                cod_clasif,
+                codigo_siaf
+              FROM bytsscom_bytcore.clasificador
+              WHERE codigo_siaf is not null
+              ORDER BY cod_clasif, codigo_siaf
         )
         SELECT
           cc.ano_eje||cast(cc.certificado as int)||f.siaf_codigo||COALESCE(SUBSTRING(cla.cod_clasif, 1, 2),'21') as id_hecho_institucional,
@@ -269,9 +277,8 @@ tables:
             and cc.ano_eje = caa.ano_eje
         inner join fuentes f
             on TRIM(cc.fuente_financ) = f.siaf_codigo
-        inner join bytsscom_bytcore.clasificador cla
-            on cla.codigo_siaf = cc.idclasificador_siaf
-            and cla.activo_clasif = 1
+        inner join clasificador cla
+            on cc.idclasificador_siaf = cla.codigo_siaf
         left join bytsscom_bytcore.meta_institucional_siaf mis
             on cc.sec_func = mis.sec_func and cc.ano_eje::integer = mis.id_anio
         inner join bytsscom_bytcore.meta_institucional mp
