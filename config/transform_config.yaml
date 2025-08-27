@@ -364,7 +364,7 @@ tables:
             on c.id_clasificador = p.id_clasificador
         inner join bytsscom_bytcore.fuente f
             on f.id_fuente = p.id_fuente
-        where not(monto_pia = 0 and monto_pim = 0) and not (id_periodo_pla=2025 and siaf_codigo = '00' and SUBSTRING(c.cod_clasif, 1, 2) ='24')
+        where not(monto_pia = 0 and monto_pim = 0)
         group by id_periodo_pla,f.siaf_codigo,p.id_area,cod_siaf_area,c.id_clasificador,SUBSTRING(c.cod_clasif, 1, 2);
 
   - table: sistema_informacion_gerencial.dm_clasificador
