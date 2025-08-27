@@ -94,7 +94,55 @@ tables:
               inner join bytsscom_bytcore.area a
                   on a.id_area = m.id_area
               where c.esta_cert = 'A' and tipo_cert = 'DP'
-          ),
+              and  cert.ano_eje = __ANIO_EJECUCION__::VARCHAR
+        ),
+        certificados_caja_chica_reembolso as(
+            SELECT
+                CAST(cr.id_anio AS VARCHAR) as ano_eje,
+                a2.cod_siaf_area,
+                cr.siaf_certificado
+            FROM bytsscom_bytsig.caja_chica_solicitud s
+                    JOIN bytsscom_bytsig.caja_chica cc
+                        ON s.id_caja_chica = cc.id_caja_chica
+                            AND s.id_tipo_solicitud_cchi != 'RD'
+                    JOIN bytsscom_bytsig.vw_certificacion cr
+                        ON cr.id_certificacion = s.id_certificado
+                    LEFT JOIN bytsscom_bytcore.vw_area_registro a
+                            ON cc.id_area = a.id_area
+                    LEFT JOIN bytsscom_bytcore.lista mo
+                            ON cr.id_moneda = mo.id_lista
+                    INNER JOIN bytsscom_bytcore.area a2
+                                ON cc.id_area = a2.id_area
+            WHERE cr.tipo_cert= 'DP'
+            AND CURRENT_DATE BETWEEN DATE(a.sys_fech_registro)
+                AND DATE(COALESCE(a.fech_caducidad, (NOW() + INTERVAL '100 years')))
+            AND cr.esta_cert = 'A'
+            AND cr.id_anio = __ANIO_EJECUCION__::INTEGER
+        ),
+        certificados_caja_chica_apertura as(
+            SELECT
+                CAST(cert.id_anio AS VARCHAR) as ano_eje,
+                a2.cod_siaf_area,
+                cert.siaf_certificado
+            FROM bytsscom_bytsig.caja_chica cc
+                    LEFT JOIN bytsscom_bytsig.vw_certificacion cert
+                            ON cc.id_apertura_ccp = cert.id_certificacion
+                                AND cert.id_certdoc = 'CAJ_CHI'
+                    LEFT JOIN bytsscom_bytcore.vw_area_registro ar
+                            ON ar.id_area = cc.id_area
+                    LEFT JOIN bytsscom_bytsig.memo_requerimiento mr
+                            ON mr.id_memo_requerimiento = cert.id_memo_requerimiento
+                    LEFT JOIN bytsscom_bytcore.lista mo
+                            ON cert.id_moneda = mo.id_lista
+                    INNER JOIN bytsscom_bytcore.area a2
+                                ON cc.id_area = a2.id_area
+            WHERE cc.est_caj_chi != 2
+            AND cert.tipo_cert= 'DP'
+            AND CURRENT_DATE BETWEEN DATE(ar.sys_fech_registro)
+                AND DATE(COALESCE(ar.fech_caducidad, (NOW() + INTERVAL '100 years')))
+            AND cert.esta_cert = 'A'
+            AND cert.id_anio = __ANIO_EJECUCION__::INTEGER
+        ),
         clasificador as (
               SELECT DISTINCT ON (cod_clasif, codigo_siaf)
                 cod_clasif,
@@ -170,7 +218,7 @@ tables:
                 cc.ano_eje as anio,
                 cc.certificado as num_certificado,
                 coalesce(ex.monto_expediente,0) as monto_expediente,
-                coalesce(caa.cod_siaf_area, '0000') as area_siaf,
+                coalesce(cchiap.cod_siaf_area,coalesce(cchire.cod_siaf_area,coalesce(caa.cod_siaf_area,'0000'))) as area_siaf,
                 f.siaf_codigo as fuente_siaf,
                 cc.generica_siaf,
                 cc.monto_detalle as monto_certificado
@@ -178,6 +226,12 @@ tables:
             left join certificado_anio_area caa
                 on cc.certificado = caa.siaf_certificado
                 and cc.ano_eje = caa.ano_eje
+            left join certificados_caja_chica_reembolso cchire
+                on cc.certificado = cchire.siaf_certificado
+                and cc.ano_eje = cchire.ano_eje
+            left join certificados_caja_chica_apertura cchiap
+                on cc.certificado = cchiap.siaf_certificado
+                and cc.ano_eje = cchiap.ano_eje
             inner join fuentes f
                 on TRIM(cc.fuente_financ) = f.siaf_codigo
             left join expediente ex
@@ -190,19 +244,67 @@ tables:
     table_type: dimension
     query: |
         with certificado_anio_area as (
-              select distinct
-                  c.siaf_certificado,
-                  cert.ano_eje,
-                  a.cod_siaf_area
-              from bytsscom_bytsig.vw_certificacion c
-              inner join bytsscom_bytsig.memo_requerimiento m
-                  on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
-              inner join bytsscom_bytsiaf.certificado cert
-                  on c.id_anio= cert.ano_eje::int and c.siaf_certificado = cert.certificado
-              inner join bytsscom_bytcore.area a
-                  on a.id_area = m.id_area
-              where c.esta_cert = 'A' and tipo_cert = 'DP'
+            select distinct
+                c.siaf_certificado,
+                cert.ano_eje,
+                a.cod_siaf_area
+            from bytsscom_bytsig.vw_certificacion c
+            inner join bytsscom_bytsig.memo_requerimiento m
+                on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
+            inner join bytsscom_bytsiaf.certificado cert
+                on c.id_anio= cert.ano_eje::int and c.siaf_certificado = cert.certificado
+            inner join bytsscom_bytcore.area a
+                on a.id_area = m.id_area
+            where c.esta_cert = 'A' and tipo_cert = 'DP'
+            and  cert.ano_eje = __ANIO_EJECUCION__::VARCHAR
           ),
+        certificados_caja_chica_reembolso as(
+            SELECT
+                CAST(cr.id_anio AS VARCHAR) as ano_eje,
+                a2.cod_siaf_area,
+                cr.siaf_certificado
+            FROM bytsscom_bytsig.caja_chica_solicitud s
+                    JOIN bytsscom_bytsig.caja_chica cc
+                        ON s.id_caja_chica = cc.id_caja_chica
+                            AND s.id_tipo_solicitud_cchi != 'RD'
+                    JOIN bytsscom_bytsig.vw_certificacion cr
+                        ON cr.id_certificacion = s.id_certificado
+                    LEFT JOIN bytsscom_bytcore.vw_area_registro a
+                            ON cc.id_area = a.id_area
+                    LEFT JOIN bytsscom_bytcore.lista mo
+                            ON cr.id_moneda = mo.id_lista
+                    INNER JOIN bytsscom_bytcore.area a2
+                                ON cc.id_area = a2.id_area
+            WHERE cr.tipo_cert= 'DP'
+            AND CURRENT_DATE BETWEEN DATE(a.sys_fech_registro)
+                AND DATE(COALESCE(a.fech_caducidad, (NOW() + INTERVAL '100 years')))
+            AND cr.esta_cert = 'A'
+            AND cr.id_anio = __ANIO_EJECUCION__::INTEGER
+        ),
+        certificados_caja_chica_apertura as(
+            SELECT
+                CAST(cert.id_anio AS VARCHAR) as ano_eje,
+                a2.cod_siaf_area,
+                cert.siaf_certificado
+            FROM bytsscom_bytsig.caja_chica cc
+                    LEFT JOIN bytsscom_bytsig.vw_certificacion cert
+                            ON cc.id_apertura_ccp = cert.id_certificacion
+                                AND cert.id_certdoc = 'CAJ_CHI'
+                    LEFT JOIN bytsscom_bytcore.vw_area_registro ar
+                            ON ar.id_area = cc.id_area
+                    LEFT JOIN bytsscom_bytsig.memo_requerimiento mr
+                            ON mr.id_memo_requerimiento = cert.id_memo_requerimiento
+                    LEFT JOIN bytsscom_bytcore.lista mo
+                            ON cert.id_moneda = mo.id_lista
+                    INNER JOIN bytsscom_bytcore.area a2
+                                ON cc.id_area = a2.id_area
+            WHERE cc.est_caj_chi != 2
+            AND cert.tipo_cert= 'DP'
+            AND CURRENT_DATE BETWEEN DATE(ar.sys_fech_registro)
+                AND DATE(COALESCE(ar.fech_caducidad, (NOW() + INTERVAL '100 years')))
+            AND cert.esta_cert = 'A'
+            AND cert.id_anio = __ANIO_EJECUCION__::INTEGER
+        ),
         certificado_consolidado as (
           select
               cc.ano_eje,
@@ -253,7 +355,7 @@ tables:
           cc.ano_eje||cast(cc.certificado as int)||f.siaf_codigo||COALESCE(SUBSTRING(cla.cod_clasif, 1, 2),'21') as id_hecho_institucional,
           cc.ano_eje as anio,
           cc.certificado as num_certificado,
-          coalesce(caa.cod_siaf_area, '0000') as area_siaf,
+          coalesce(cchiap.cod_siaf_area,coalesce(cchire.cod_siaf_area,coalesce(caa.cod_siaf_area,'0000'))) as area_siaf,
           cc.secuencia,
           cc.sec_ejec as ejecutora,
           cc.monto_detalle as monto_clasificador,
@@ -275,6 +377,12 @@ tables:
         left join certificado_anio_area caa
             on cc.certificado = caa.siaf_certificado
             and cc.ano_eje = caa.ano_eje
+        left join certificados_caja_chica_reembolso cchire
+            on cc.certificado = cchire.siaf_certificado
+            and cc.ano_eje = cchire.ano_eje
+        left join certificados_caja_chica_apertura cchiap
+            on cc.certificado = cchiap.siaf_certificado
+            and cc.ano_eje = cchiap.ano_eje
         inner join fuentes f
             on TRIM(cc.fuente_financ) = f.siaf_codigo
         inner join clasificador cla
