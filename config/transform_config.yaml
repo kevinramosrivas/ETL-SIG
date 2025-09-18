@@ -583,6 +583,7 @@ tables:
                     ON ce.id_certificacion = p.id_certificacion AND ce.id_certdoc::text = 'RRHH'::text AND
                         ce.tipo_cert = 'DP'::bpchar AND ce.esta_cert = 'A'
                 WHERE p.id_anio = __ANIO_EJECUCION__::INTEGER
+                      and p.id_registro is not null
         )
         SELECT
             d.id_anio AS anio,
