@@ -404,7 +404,7 @@ tables:
         SELECT DISTINCT ON (id_clasificador)
                 id_clasificador as codigo_siaf,
                 tipo_transaccion || generica AS generica,
-                tipo_transaccion || generica || subgenerica || subgenerica_det || especifica || especifica_det AS cod_clasif,
+                tipo_transaccion || generica || ' ' || subgenerica || subgenerica_det || ' ' || especifica || ' ' || especifica_det AS cod_clasif,
                 descripcion
             FROM bytsscom_bytsiaf.especifica_detalle
             ORDER BY id_clasificador, descripcion ,ano_eje DESC
@@ -488,7 +488,7 @@ tables:
         SELECT DISTINCT ON (id_clasificador)
             id_clasificador as idclasificador_siaf,
             tipo_transaccion || generica AS generica,
-            tipo_transaccion || generica || subgenerica || subgenerica_det || especifica || especifica_det AS clasificador,
+            tipo_transaccion || generica || ' ' || subgenerica || subgenerica_det || ' ' || especifica || ' ' || especifica_det AS clasificador,
             descripcion
         FROM bytsscom_bytsiaf.especifica_detalle
         ORDER BY id_clasificador, descripcion ,ano_eje DESC
@@ -514,7 +514,7 @@ tables:
     table_type: fact
     query: |
         WITH
-        Ejecucion_Status AS (
+        Ejecucion_Status AS MATERIALIZED(
             SELECT
                 p.id_planilla,
                 COALESCE(
@@ -539,7 +539,7 @@ tables:
             GROUP BY
                 p.id_planilla
         ),
-        Datos_Planilla_Brutos AS (
+        Datos_Planilla_Brutos AS MATERIALIZED(
             SELECT
                 p.id_planilla,
                 ptm.id_persona,
