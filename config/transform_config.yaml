@@ -27,7 +27,7 @@ tables:
               else 11327 end as is_central
       from bytsscom_bytcore.area
       where id_parent_area = 10030 and length(area_name) = 5
-      and id_area in (10383, 10390, 10395, 10385)
+      and id_area in (10383, 10390, 10395, 10385,11581)
       union
       select
           10000 as id_area,
@@ -46,12 +46,12 @@ tables:
           10000 as id_superior
       union
       select
-          10468 as id_area,
-          'F' as cod_area,
-          '1000' as area_siaf,
-          'FACULTADES' as desc_area,
-          1 as nivel,
-          10000 as id_superior;
+        10468 as id_area,
+        'F' as cod_area,
+        '1000' as area_siaf,
+        'FACULTADES' as desc_area,
+        1 as nivel,
+        10000 as id_superior;
 
   - table: sistema_informacion_gerencial.dm_fuente
     partitioned: false
@@ -200,18 +200,18 @@ tables:
                 and es.ano_eje = em.ano_eje
                 and es.secuencia = em.secuencia
                 and es.correlativo = em.correlativo
-                and em.ciclo = 'G' and em.fase = 'D'
+                and em.ciclo = 'G' and em.fase IN ('C','D')
              inner join bytsscom_bytsiaf.expediente_fase ef
                 on es.ano_eje = ef.ano_eje
                 and es.expediente = ef.expediente
                 and es.secuencia = ef.secuencia
-                and ef.fuente_financ != '88'
+                --and ef.fuente_financ != '88'
              left join clasificador c
                 on c.codigo_siaf = em.id_clasificador
              left join certificado_anio_area caa
                 on caa.siaf_certificado = ef.certificado
                 and caa.ano_eje = es.ano_eje
-            WHERE es.ciclo = 'G' and es.fase = 'D' and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
+            WHERE es.ciclo = 'G' and es.fase IN ('C','D') and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
             group by es.ano_eje,es.sec_ejec,ef.fuente_financ,SUBSTRING(c.cod_clasif, 1, 2),caa.ano_eje,ef.certificado
         )
             SELECT
@@ -433,15 +433,16 @@ tables:
             and es.ano_eje = em.ano_eje
             and es.secuencia = em.secuencia
             and es.correlativo = em.correlativo
-            and em.ciclo = 'G' and em.fase = 'D'
+            and em.ciclo = 'G' and em.fase IN ('C','D')
         inner join bytsscom_bytsiaf.expediente_fase ef
             on es.ano_eje = ef.ano_eje
             and es.expediente = ef.expediente
             and es.secuencia = ef.secuencia
-            and ef.fuente_financ != '88'
+            --and ef.fuente_financ != '88'
         left join clasificador c
             on c.codigo_siaf = em.id_clasificador
-        WHERE es.ciclo = 'G' and es.fase = 'D' and (certificado is not null) and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
+        WHERE es.ciclo = 'G' and es.fase IN ('C','D') 
+        and (certificado is not null) and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
         group by es.ano_eje,es.sec_ejec,ef.expediente,
         ef.certificado,ef.certificado_secuencia,ef.fase,es.secuencia,es.correlativo,
         ef.ciclo,es.fecha_autorizacion,em.id_clasificador,c.cod_clasif,es.cod_doc,es.num_doc,em.estado_envio,ef.fuente_financ;
