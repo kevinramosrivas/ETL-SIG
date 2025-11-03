@@ -211,7 +211,7 @@ tables:
              left join certificado_anio_area caa
                 on caa.siaf_certificado = ef.certificado
                 and caa.ano_eje = es.ano_eje
-            WHERE es.ciclo = 'G' and es.fase IN ('C','D') and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
+            WHERE es.ciclo = 'G' and es.fase = 'D' and es.fase IN ('C','D') and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
             group by es.ano_eje,es.sec_ejec,ef.fuente_financ,SUBSTRING(c.cod_clasif, 1, 2),caa.ano_eje,ef.certificado
         )
             SELECT
