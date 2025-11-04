@@ -514,7 +514,7 @@ tables:
         ORDER BY id_clasificador, descripcion ,ano_eje DESC;
 
   - table: sistema_informacion_gerencial.dm_pim_clasificador
-    partitioned: false
+    partitioned: true
     source_type: sql
     table_type: dimension
     query: |
@@ -525,7 +525,7 @@ tables:
             id_clasificador as idclasificador_siaf,
             monto_asignado as monto_pim
         FROM bytsscom_bytsiaf.mpp_pca_x_especifica
-        WHERE ano_eje in ('2020','2021','2022','2023','2024','2025')
+        WHERE ano_eje = __ANIO_EJECUCION__::VARCHAR
 
 #   - table: sistema_informacion_gerencial.hechos_rrhh_consolidados
 #     partitioned: true
