@@ -220,7 +220,7 @@ tables:
                     left join certificado_anio_area caa
                                 on caa.siaf_certificado = ef.certificado
                                     and caa.ano_eje = es.ano_eje
-            WHERE es.ciclo = 'G' and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
+            WHERE es.ciclo = 'G' and es.ano_eje= __ANIO_EJECUCION__::VARCHAR and (certificado is not null) and ef.fuente_financ != '88'
             group by es.ano_eje,es.sec_ejec,ef.fuente_financ,SUBSTRING(c.cod_clasif, 1, 2),caa.ano_eje,ef.certificado, id_clasificador
         )
         SELECT
@@ -461,6 +461,7 @@ tables:
                         on c.codigo_siaf = em.id_clasificador
         WHERE es.ciclo = 'G'
         and (certificado is not null) and es.ano_eje= __ANIO_EJECUCION__::VARCHAR
+        and ef.fuente_financ != '88'
         group by es.ano_eje,es.sec_ejec,ef.expediente,
                 ef.certificado,ef.certificado_secuencia,ef.fase,es.secuencia,es.correlativo,
                 ef.ciclo,es.fecha_autorizacion,em.id_clasificador,c.cod_clasif,es.cod_doc,es.num_doc,em.estado_envio,ef.fuente_financ;
@@ -498,20 +499,19 @@ tables:
         group by id_periodo_pla,f.siaf_codigo,p.id_area,cod_siaf_area,c.id_clasificador,SUBSTRING(c.cod_clasif, 1, 2);
 
   - table: sistema_informacion_gerencial.dm_clasificador
-    partitioned: false
+    partitioned: true
     source_type: sql
-    table_type: dimension
+    table_type: dimension_base
     query: |
-        SELECT *
-        FROM (
         SELECT DISTINCT ON (id_clasificador)
-            id_clasificador as idclasificador_siaf,
-            tipo_transaccion || generica AS generica,
-            tipo_transaccion || generica || ' ' || subgenerica || subgenerica_det || ' ' || especifica || ' ' || especifica_det AS clasificador,
-            descripcion
+        ano_eje as anio,
+        id_clasificador as idclasificador_siaf,
+        tipo_transaccion || generica AS generica,
+        tipo_transaccion || generica ||  subgenerica || subgenerica_det || especifica ||  especifica_det AS clasificador,
+        descripcion
         FROM bytsscom_bytsiaf.especifica_detalle
-        ORDER BY id_clasificador, descripcion ,ano_eje DESC
-        ) AS sub;
+        WHERE ano_eje = __ANIO_EJECUCION__::VARCHAR
+        ORDER BY id_clasificador, descripcion ,ano_eje DESC;
 
   - table: sistema_informacion_gerencial.dm_pim_clasificador
     partitioned: false
@@ -527,125 +527,125 @@ tables:
         FROM bytsscom_bytsiaf.mpp_pca_x_especifica
         WHERE ano_eje in ('2020','2021','2022','2023','2024','2025')
 
-  - table: sistema_informacion_gerencial.hechos_rrhh_consolidados
-    partitioned: true
-    source_type: sql
-    table_type: fact
-    query: |
-        WITH
-        Ejecucion_Status AS MATERIALIZED(
-            SELECT
-                p.id_planilla,
-                COALESCE(
-                        BOOL_OR(
-                                (tipo_fase IN ('CA','C') AND estado_fase IN ('F','A'))
-                                    OR (tipo_fase = 'D' AND estado_fase = 'F')
-                                    OR (tipo_fase = 'G' AND estado_fase IN ('F','P'))
-                        ),
-                        false
-                ) AS est_mont_comp,
-                COALESCE(
-                        BOOL_OR(
-                                (tipo_fase = 'D' AND estado_fase = 'F')
-                                OR (tipo_fase = 'G' AND estado_fase IN ('F','P'))
-                        ),
-                        false
-                ) AS est_mont_dev
-            FROM
-                bytsscom_bytrrhh.vw_planilla_fase pf
-            JOIN bytsscom_bytrrhh.planilla p ON p.id_planilla = pf.id_planilla
-            WHERE p.id_anio = __ANIO_EJECUCION__::INTEGER
-            GROUP BY
-                p.id_planilla
-        ),
-        Datos_Planilla_Brutos AS MATERIALIZED(
-            SELECT
-                p.id_planilla,
-                ptm.id_persona,
-                p.num_planilla,
-                ptipo.cod_tipo_pla,
-                ptipo.nomb_tipo_pla,
-                tt.cod_tipo_trabajador,
-                tt.desc_tipo_trabajador,
-                ep.cod_lista,
-                ep.desc_lista,
-                ce.siaf_certificado,
-                p.id_anio AS id_anio,
-                COALESCE(an.id_area_root, ptm.id_unidad) AS id_area,
-                COALESCE(an.id_area_root, ptm.id_unidad) AS n_id_ud_id,
-                ms.id_meta_institucional as id_meta,
-                ms.sec_func AS cod_meta,
-                ms.sec_func AS meta,
-                f.siaf_codigo AS fuente,
-                cg.id_clasificador AS id_generica,
-                cg.cod_clasif AS generica,
-                c.cod_clasif,
-                c.codigo_siaf,
-                c.id_clasificador,
-                ptm.monto_bruto,
-                ejx.est_mont_comp,
-                ejx.est_mont_dev
-            FROM
-                bytsscom_bytrrhh.planilla_trabajador_meta ptm
-                    JOIN bytsscom_bytrrhh.planilla p ON p.id_planilla = ptm.id_planilla
-                    JOIN bytsscom_bytrrhh.planilla_tipo ptipo ON ptipo.id_tipo_planilla = p.id_tipo_planilla
-                    JOIN bytsscom_bytrrhh.planilla_trabajador pt ON ptm.id_planilla = pt.id_planilla AND ptm.id_persona = pt.id_persona AND ptm.id_corr_trab = pt.id_corr_trab
-                    JOIN bytsscom_bytrrhh.tipo_trabajador tt ON p.id_tipo_trabajador = tt.id_tipo_trabajador
-                    LEFT JOIN bytsscom_bytcore.lista ep ON p.id_estado_personal_pla = ep.id_lista
-                    LEFT JOIN bytsscom_bytrrhh.vw_area_new an ON an.id_area = pt.id_area_subv
-                    JOIN bytsscom_bytsig.tarea_meta tm ON tm.id_tarea_meta = ptm.id_tarea_meta
-                    JOIN bytsscom_bytcore.meta_institucional mi ON mi.id_meta_institucional = tm.id_meta_institucional
-                    JOIN bytsscom_bytcore.meta_institucional_siaf ms ON mi.id_meta_institucional = ms.id_meta_institucional AND ms.id_anio = tm.id_anio_item
-                    JOIN bytsscom_bytcore.fuente f ON f.id_fuente = tm.id_fuente
-                    JOIN bytsscom_bytcore.clasificador c ON c.id_clasificador = ptm.id_clasificador
-                    JOIN bytsscom_bytcore.clasificador cg ON cg.cod_clasif = split_part(c.cod_clasif, ' ', 1) AND cg.id_nivel = 2
-                    JOIN Ejecucion_Status ejx ON ejx.id_planilla = p.id_planilla
-                    JOIN bytsscom_bytsig.certificacion ce
-                    ON ce.id_certificacion = p.id_certificacion AND ce.id_certdoc::text = 'RRHH'::text AND
-                        ce.tipo_cert = 'DP'::bpchar AND ce.esta_cert = 'A'
-                WHERE p.id_anio = __ANIO_EJECUCION__::INTEGER
-                      and p.id_registro is not null
-        )
-        SELECT
-            d.id_anio AS anio,
-            d.siaf_certificado as certificado,
-            d.id_planilla,
-            d.id_meta,
-            d.cod_meta,
-            d.num_planilla,
-            a.cod_siaf_area as area_siaf,
-            d.cod_tipo_pla,
-            d.nomb_tipo_pla,
-            d.cod_tipo_trabajador,
-            d.desc_tipo_trabajador,
-            d.cod_lista as cod_estado_trabajador,
-            d.desc_lista as desc_estado_trabajador,
-            d.fuente as fuente_siaf,
-            d.generica as generica_siaf,
-            d.codigo_siaf as idclasificador_siaf,
-            COUNT(DISTINCT d.id_persona) AS cantidad_trabajadores,
-            sum(CASE WHEN d.est_mont_comp THEN d.monto_bruto ELSE 0 END) AS monto_certificado,
-            sum(CASE WHEN d.est_mont_dev THEN d.monto_bruto ELSE 0 END) AS monto_expediente
-        FROM
-            Datos_Planilla_Brutos d
-        INNER JOIN bytsscom_bytcore.area a
-        ON a.id_area = d.id_area
-        GROUP BY
-            d.num_planilla,
-            d.id_anio,
-            a.cod_siaf_area,
-            d.id_meta,
-            d.cod_meta,
-            d.fuente,
-            d.id_generica,
-            d.generica,
-            d.cod_clasif,
-            d.codigo_siaf,
-            d.siaf_certificado,
-            d.nomb_tipo_pla,
-            d.cod_tipo_pla,
-            d.cod_tipo_trabajador,
-            d.desc_tipo_trabajador,
-            d.cod_lista,
-            d.desc_lista,
-            d.id_planilla
+#   - table: sistema_informacion_gerencial.hechos_rrhh_consolidados
+#     partitioned: true
+#     source_type: sql
+#     table_type: fact
+#     query: |
+#         WITH
+#         Ejecucion_Status AS MATERIALIZED(
+#             SELECT
+#                 p.id_planilla,
+#                 COALESCE(
+#                         BOOL_OR(
+#                                 (tipo_fase IN ('CA','C') AND estado_fase IN ('F','A'))
+#                                     OR (tipo_fase = 'D' AND estado_fase = 'F')
+#                                     OR (tipo_fase = 'G' AND estado_fase IN ('F','P'))
+#                         ),
+#                         false
+#                 ) AS est_mont_comp,
+#                 COALESCE(
+#                         BOOL_OR(
+#                                 (tipo_fase = 'D' AND estado_fase = 'F')
+#                                 OR (tipo_fase = 'G' AND estado_fase IN ('F','P'))
+#                         ),
+#                         false
+#                 ) AS est_mont_dev
+#             FROM
+#                 bytsscom_bytrrhh.vw_planilla_fase pf
+#             JOIN bytsscom_bytrrhh.planilla p ON p.id_planilla = pf.id_planilla
+#             WHERE p.id_anio = __ANIO_EJECUCION__::INTEGER
+#             GROUP BY
+#                 p.id_planilla
+#         ),
+#         Datos_Planilla_Brutos AS MATERIALIZED(
+#             SELECT
+#                 p.id_planilla,
+#                 ptm.id_persona,
+#                 p.num_planilla,
+#                 ptipo.cod_tipo_pla,
+#                 ptipo.nomb_tipo_pla,
+#                 tt.cod_tipo_trabajador,
+#                 tt.desc_tipo_trabajador,
+#                 ep.cod_lista,
+#                 ep.desc_lista,
+#                 ce.siaf_certificado,
+#                 p.id_anio AS id_anio,
+#                 COALESCE(an.id_area_root, ptm.id_unidad) AS id_area,
+#                 COALESCE(an.id_area_root, ptm.id_unidad) AS n_id_ud_id,
+#                 ms.id_meta_institucional as id_meta,
+#                 ms.sec_func AS cod_meta,
+#                 ms.sec_func AS meta,
+#                 f.siaf_codigo AS fuente,
+#                 cg.id_clasificador AS id_generica,
+#                 cg.cod_clasif AS generica,
+#                 c.cod_clasif,
+#                 c.codigo_siaf,
+#                 c.id_clasificador,
+#                 ptm.monto_bruto,
+#                 ejx.est_mont_comp,
+#                 ejx.est_mont_dev
+#             FROM
+#                 bytsscom_bytrrhh.planilla_trabajador_meta ptm
+#                     JOIN bytsscom_bytrrhh.planilla p ON p.id_planilla = ptm.id_planilla
+#                     JOIN bytsscom_bytrrhh.planilla_tipo ptipo ON ptipo.id_tipo_planilla = p.id_tipo_planilla
+#                     JOIN bytsscom_bytrrhh.planilla_trabajador pt ON ptm.id_planilla = pt.id_planilla AND ptm.id_persona = pt.id_persona AND ptm.id_corr_trab = pt.id_corr_trab
+#                     JOIN bytsscom_bytrrhh.tipo_trabajador tt ON p.id_tipo_trabajador = tt.id_tipo_trabajador
+#                     LEFT JOIN bytsscom_bytcore.lista ep ON p.id_estado_personal_pla = ep.id_lista
+#                     LEFT JOIN bytsscom_bytrrhh.vw_area_new an ON an.id_area = pt.id_area_subv
+#                     JOIN bytsscom_bytsig.tarea_meta tm ON tm.id_tarea_meta = ptm.id_tarea_meta
+#                     JOIN bytsscom_bytcore.meta_institucional mi ON mi.id_meta_institucional = tm.id_meta_institucional
+#                     JOIN bytsscom_bytcore.meta_institucional_siaf ms ON mi.id_meta_institucional = ms.id_meta_institucional AND ms.id_anio = tm.id_anio_item
+#                     JOIN bytsscom_bytcore.fuente f ON f.id_fuente = tm.id_fuente
+#                     JOIN bytsscom_bytcore.clasificador c ON c.id_clasificador = ptm.id_clasificador
+#                     JOIN bytsscom_bytcore.clasificador cg ON cg.cod_clasif = split_part(c.cod_clasif, ' ', 1) AND cg.id_nivel = 2
+#                     JOIN Ejecucion_Status ejx ON ejx.id_planilla = p.id_planilla
+#                     JOIN bytsscom_bytsig.certificacion ce
+#                     ON ce.id_certificacion = p.id_certificacion AND ce.id_certdoc::text = 'RRHH'::text AND
+#                         ce.tipo_cert = 'DP'::bpchar AND ce.esta_cert = 'A'
+#                 WHERE p.id_anio = __ANIO_EJECUCION__::INTEGER
+#                       and p.id_registro is not null
+#         )
+#         SELECT
+#             d.id_anio AS anio,
+#             d.siaf_certificado as certificado,
+#             d.id_planilla,
+#             d.id_meta,
+#             d.cod_meta,
+#             d.num_planilla,
+#             a.cod_siaf_area as area_siaf,
+#             d.cod_tipo_pla,
+#             d.nomb_tipo_pla,
+#             d.cod_tipo_trabajador,
+#             d.desc_tipo_trabajador,
+#             d.cod_lista as cod_estado_trabajador,
+#             d.desc_lista as desc_estado_trabajador,
+#             d.fuente as fuente_siaf,
+#             d.generica as generica_siaf,
+#             d.codigo_siaf as idclasificador_siaf,
+#             COUNT(DISTINCT d.id_persona) AS cantidad_trabajadores,
+#             sum(CASE WHEN d.est_mont_comp THEN d.monto_bruto ELSE 0 END) AS monto_certificado,
+#             sum(CASE WHEN d.est_mont_dev THEN d.monto_bruto ELSE 0 END) AS monto_expediente
+#         FROM
+#             Datos_Planilla_Brutos d
+#         INNER JOIN bytsscom_bytcore.area a
+#         ON a.id_area = d.id_area
+#         GROUP BY
+#             d.num_planilla,
+#             d.id_anio,
+#             a.cod_siaf_area,
+#             d.id_meta,
+#             d.cod_meta,
+#             d.fuente,
+#             d.id_generica,
+#             d.generica,
+#             d.cod_clasif,
+#             d.codigo_siaf,
+#             d.siaf_certificado,
+#             d.nomb_tipo_pla,
+#             d.cod_tipo_pla,
+#             d.cod_tipo_trabajador,
+#             d.desc_tipo_trabajador,
+#             d.cod_lista,
+#             d.desc_lista,
+#             d.id_planilla
