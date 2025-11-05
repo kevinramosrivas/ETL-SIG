@@ -5,3 +5,4 @@ prefect
 beautifulsoup4
 pandas
 openpyxl
+python-dotenv

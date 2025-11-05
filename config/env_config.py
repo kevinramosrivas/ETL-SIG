@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     path_local : str
     path_extract : str
     class Config:
-        env_file = ".env"
+        env_file = "client_prefect.env"
+        extra = "ignore"
 
 settings = Settings()
 
