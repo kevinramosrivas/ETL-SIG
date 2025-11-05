@@ -474,8 +474,8 @@ tables:
       module: tasks.scrapers
       function: scrape_and_load_pim
       
-  - table: sistema_informacion_gerencial.dm_pim
-    partitioned: false
+  - table: sistema_informacion_gerencial.dm_pim_q20
+    partitioned: true
     source_type: sql
     table_type: dimension
     query: |
@@ -495,7 +495,7 @@ tables:
             on c.id_clasificador = p.id_clasificador
         inner join bytsscom_bytcore.fuente f
             on f.id_fuente = p.id_fuente
-        where not(monto_pia = 0 and monto_pim = 0)
+        where not(monto_pia = 0 and monto_pim = 0) AND id_periodo_pla = __ANIO_EJECUCION__::INTEGER
         group by id_periodo_pla,f.siaf_codigo,p.id_area,cod_siaf_area,c.id_clasificador,SUBSTRING(c.cod_clasif, 1, 2);
 
   - table: sistema_informacion_gerencial.dm_clasificador
@@ -525,7 +525,7 @@ tables:
             id_clasificador as idclasificador_siaf,
             monto_asignado as monto_pim
         FROM bytsscom_bytsiaf.mpp_pca_x_especifica
-        WHERE ano_eje = __ANIO_EJECUCION__::VARCHAR
+        WHERE ano_eje = __ANIO_EJECUCION__::VARCHAR AND id_clasificador != 'AAAAAAA'
 
 #   - table: sistema_informacion_gerencial.hechos_rrhh_consolidados
 #     partitioned: true

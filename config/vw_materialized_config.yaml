@@ -8,6 +8,6 @@ tables:
   - vm_dm_certificado
   - vm_dm_expediente
   - vm_hechos_pim
-  - vm_dm_pim
+  - vm_dm_pim_q20
   - vm_pim_clasificador
   - vm_search_clasificador_area
