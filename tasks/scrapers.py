@@ -73,7 +73,6 @@ def scrape_and_load_pim(year: str, target_table: str) -> pd.DataFrame:
 
     # Paso 6: concatenar todo y volcar a CSV en memoria
     final_df = pd.concat(all_dfs, ignore_index=True)
-    final_df['EJECUTORA'] = 88
     final_df['ANIO'] = year
     final_df['GENERICA_SIAF'] = final_df['CODIGO'].apply(getCodigoGenerica)
     final_df.rename(columns={'PIM': 'MONTO_PIM'}, inplace=True)
@@ -86,10 +85,10 @@ def scrape_and_load_pim(year: str, target_table: str) -> pd.DataFrame:
     final_df["MONTO_PIM"] = final_df["MONTO_PIM"].astype(float)
 
     # Solo convierte a float si hay datos
-    filtered_df = final_df[["ANIO","EJECUTORA","FUENTE_SIAF","GENERICA_SIAF","MONTO_PIA","MONTO_PIM"]]
+    filtered_df = final_df[["ANIO","FUENTE_SIAF","GENERICA_SIAF","MONTO_PIA","MONTO_PIM"]]
     filtered_df = (
         filtered_df.groupby(
-            ["ANIO", "EJECUTORA", "FUENTE_SIAF", "GENERICA_SIAF"],
+            ["ANIO", "FUENTE_SIAF", "GENERICA_SIAF"],
             as_index=False
         )
         .agg({
