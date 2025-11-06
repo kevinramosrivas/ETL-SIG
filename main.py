@@ -1,6 +1,5 @@
 import os
 from prefect import flow, get_run_logger
-from flows.extraccion import extraccion
 from flows.transformacion_carga import transformacion_carga
 
 
@@ -9,7 +8,6 @@ from flows.transformacion_carga import transformacion_carga
 def etl_sig() -> None:
     logger = get_run_logger()
     logger.info(f"La ruta actual es: {os.getcwd()}")
-    #extraccion()
     transformacion_carga()
     logger.info("ETL finalizado.")
 
