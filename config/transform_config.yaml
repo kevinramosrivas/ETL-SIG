@@ -89,7 +89,7 @@ tables:
               from bytsscom_bytsig.vw_certificacion c
               inner join bytsscom_bytsig.memo_requerimiento m
                   on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
-              inner join bytsscom_bytsiaf.certificado cert
+              inner join bytsscom_bytsiaf.sig_certificado cert
                   on c.id_anio= cert.ano_eje::int and c.siaf_certificado = cert.certificado
               inner join bytsscom_bytcore.area a
                   on a.id_area = m.id_area
@@ -149,7 +149,7 @@ tables:
                 tipo_transaccion || generica AS generica,
                 tipo_transaccion || generica || subgenerica || subgenerica_det || especifica || especifica_det AS cod_clasif,
                 descripcion
-            FROM bytsscom_bytsiaf.especifica_detalle ed
+            FROM bytsscom_bytsiaf.sig_especifica_detalle ed
             WHERE ed.ano_eje= __ANIO_EJECUCION__::VARCHAR
             ORDER BY id_clasificador, descripcion ,ano_eje DESC
         ),
@@ -165,12 +165,12 @@ tables:
                 cla.cod_clasif,
                 SUM(CASE WHEN cod_doc in ('086','000') THEN cm.monto_nacional ELSE 0 END) AS monto_certificado,
                 SUM(cm.monto_comprometido) AS monto_compromiso_anual
-            from bytsscom_bytsiaf.certificado_secuencia cs
-                    inner join bytsscom_bytsiaf.certificado_fase cf
+            from bytsscom_bytsiaf.sig_certificado_secuencia cs
+                    inner join bytsscom_bytsiaf.sig_certificado_fase cf
                                 on cs.certificado = cf.certificado
                                     and cs.ano_eje = cf.ano_eje
                                     and cs.secuencia = cf.secuencia
-                    inner join bytsscom_bytsiaf.certificado_meta cm
+                    inner join bytsscom_bytsiaf.sig_certificado_meta cm
                                 on cs.certificado = cm.certificado
                                     and cs.ano_eje = cm.ano_eje
                                     and cs.secuencia = cm.secuencia
@@ -201,15 +201,15 @@ tables:
                 SUM(CASE WHEN es.fase = 'C' THEN em.monto_nacional ELSE 0 END) AS monto_compromiso_mensual,
                 SUM(CASE WHEN es.fase = 'D' THEN em.monto_nacional ELSE 0 END) AS monto_devengado,
                 SUM(CASE WHEN es.fase = 'G' THEN em.monto_nacional ELSE 0 END) AS monto_girado
-            FROM bytsscom_bytsiaf.expediente_secuencia es
-                    inner join bytsscom_bytsiaf.expediente_meta em
+            FROM bytsscom_bytsiaf.sig_expediente_secuencia es
+                    inner join bytsscom_bytsiaf.sig_expediente_meta em
                                 on es.expediente = em.expediente
                                     and es.ano_eje = em.ano_eje
                                     and es.secuencia = em.secuencia
                                     and es.correlativo = em.correlativo
                                     and es.fase = em.fase
                                     and es.ciclo = em.ciclo
-                    inner join bytsscom_bytsiaf.expediente_fase ef
+                    inner join bytsscom_bytsiaf.sig_expediente_fase ef
                                 on es.ano_eje = ef.ano_eje
                                     and es.expediente = ef.expediente
                                     and es.secuencia = ef.secuencia
@@ -267,7 +267,7 @@ tables:
             from bytsscom_bytsig.vw_certificacion c
             inner join bytsscom_bytsig.memo_requerimiento m
                 on c.id_memo_requerimiento = m.id_memo_requerimiento and c.id_anio = m.id_anio
-            inner join bytsscom_bytsiaf.certificado cert
+            inner join bytsscom_bytsiaf.sig_certificado cert
                 on c.id_anio= cert.ano_eje::int and c.siaf_certificado = cert.certificado
             inner join bytsscom_bytcore.area a
                 on a.id_area = m.id_area
@@ -338,12 +338,12 @@ tables:
               cm.sec_func,
               cm.id_clasificador as idclasificador_siaf,
               sum(cm.monto_nacional) as monto_detalle
-          from bytsscom_bytsiaf.certificado_secuencia cc
-          inner join bytsscom_bytsiaf.certificado_fase cf
+          from bytsscom_bytsiaf.sig_certificado_secuencia cc
+          inner join bytsscom_bytsiaf.sig_certificado_fase cf
             on cc.certificado = cf.certificado
             and cc.ano_eje = cf.ano_eje
             and cc.secuencia = cf.secuencia
-          inner join bytsscom_bytsiaf.certificado_meta cm
+          inner join bytsscom_bytsiaf.sig_certificado_meta cm
             on cc.certificado = cm.certificado
             and cc.ano_eje = cm.ano_eje
             and cc.secuencia = cm.secuencia
@@ -365,7 +365,7 @@ tables:
                 tipo_transaccion || generica AS generica,
                 tipo_transaccion || generica || subgenerica || subgenerica_det || especifica || especifica_det AS cod_clasif,
                 descripcion
-            FROM bytsscom_bytsiaf.especifica_detalle
+            FROM bytsscom_bytsiaf.sig_especifica_detalle
             ORDER BY id_clasificador, descripcion ,ano_eje DESC
         )
         SELECT
@@ -421,7 +421,7 @@ tables:
                 tipo_transaccion || generica AS generica,
                 tipo_transaccion || generica || subgenerica || subgenerica_det || especifica || especifica_det AS cod_clasif,
                 descripcion
-            FROM bytsscom_bytsiaf.especifica_detalle ed
+            FROM bytsscom_bytsiaf.sig_especifica_detalle ed
             WHERE ed.ano_eje= __ANIO_EJECUCION__::VARCHAR
             ORDER BY id_clasificador, descripcion ,ano_eje DESC
         )
@@ -443,15 +443,15 @@ tables:
             es.cod_doc,
             es.num_doc,
             em.estado_envio
-        FROM bytsscom_bytsiaf.expediente_secuencia es
-                inner join bytsscom_bytsiaf.expediente_meta em
+        FROM bytsscom_bytsiaf.sig_expediente_secuencia es
+                inner join bytsscom_bytsiaf.sig_expediente_meta em
                             on es.expediente = em.expediente
                                 and es.ano_eje = em.ano_eje
                                 and es.secuencia = em.secuencia
                                 and es.correlativo = em.correlativo
                                 and es.fase = em.fase
                                 and es.ciclo = em.ciclo
-                inner join bytsscom_bytsiaf.expediente_fase ef
+                inner join bytsscom_bytsiaf.sig_expediente_fase ef
                             on es.ano_eje = ef.ano_eje
                                 and es.expediente = ef.expediente
                                 and es.secuencia = ef.secuencia
@@ -509,7 +509,7 @@ tables:
         tipo_transaccion || generica AS generica,
         tipo_transaccion || generica ||  subgenerica || subgenerica_det || especifica ||  especifica_det AS clasificador,
         descripcion
-        FROM bytsscom_bytsiaf.especifica_detalle
+        FROM bytsscom_bytsiaf.sig_especifica_detalle
         WHERE ano_eje = __ANIO_EJECUCION__::VARCHAR
         ORDER BY id_clasificador, descripcion ,ano_eje DESC;
 
@@ -524,7 +524,7 @@ tables:
             tipo_transaccion || generica as generica_siaf,
             id_clasificador as idclasificador_siaf,
             monto_asignado as monto_pim
-        FROM bytsscom_bytsiaf.mpp_pca_x_especifica
+        FROM bytsscom_bytsiaf.sig_mpp_pca_x_especifica
         WHERE ano_eje = __ANIO_EJECUCION__::VARCHAR AND id_clasificador != 'AAAAAAA'
 
 #   - table: sistema_informacion_gerencial.hechos_rrhh_consolidados
