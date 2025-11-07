@@ -4,6 +4,7 @@ from typing import Any, List
 from pydantic import ValidationError
 from config.models.extract_model import ExtraTableSettings 
 from config.models.transform_model import TransformTablesConfig
+from config.env_config import settings
 from pathlib import Path
 import yaml
 
@@ -29,7 +30,7 @@ def _replace_placeholder(obj: Any, placeholder: str, value: str) -> Any:
     
 
 
-def get_years_to_extract(n=2):
+def get_years_to_extract(n):
     # Leer año actual desde variable, si no existe usar el año actual del sistema
     periodo_hasta = int(datetime.datetime.now().now().year)
     periodo_desde = int(datetime.datetime.now().now().year - n) 
@@ -46,7 +47,7 @@ def load_table_configs(path: str = "extract_config.yaml") -> ExtraTableSettings:
     with open(full_path, "r", encoding="utf-8") as f:
         raw_config = yaml.safe_load(f)
 
-    years = get_years_to_extract()
+    years = get_years_to_extract(settings.sig_extraccion_anios_historicos)
     for table in raw_config.get("tables", []):        
         filters = table.get("filters", {})
         # Reemplaza __YEARS__ por la lista de años

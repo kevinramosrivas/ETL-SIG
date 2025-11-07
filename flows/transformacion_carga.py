@@ -6,6 +6,7 @@ from tasks.cargar_datos_desde_dataframe import cargar_datos_desde_dataframe
 from tasks.actualizar_vw_materializadas import actualizar_vw_materializadas
 from config.utils.load_tables_config import get_years_to_extract, load_table_tranform
 from config.utils.load_views_config import load_views_configs
+from config.env_config import settings
 
 
 def _procesar_tabla(
@@ -18,6 +19,7 @@ def _procesar_tabla(
     logger.info("------------------------------------------------------------")
     logger.info(f"Procesando tabla: {tabla} ({tcfg.source_type})")
     logger.info("------------------------------------------------------------")
+   
 
     # Si la tabla es particionada, creamos primero la partición
     crear = None
@@ -72,11 +74,12 @@ def _procesar_tabla(
 
 @flow(name="ETL-SIG:Transformacion_carga")
 def transformacion_carga() -> None:
+    YEARS_TO_EXTRACT = settings.sig_extraccion_anios_historicos
     logger = get_run_logger()
     cargadas_no_particionadas: set[str] = set()
 
     logger.info("=== Inicio: Procesamiento de Tablas DIMENSION_BASE ===")
-    for anio in get_years_to_extract():
+    for anio in get_years_to_extract(YEARS_TO_EXTRACT):
         logger.info(f"Anio {anio} (DIMENSION_BASE)")
         config_fact = load_table_tranform(anio, table_type="dimension_base")
         for tcfg in config_fact.tables:
@@ -85,7 +88,7 @@ def transformacion_carga() -> None:
 
     #Primero: todas las tablas FACT, año por año
     logger.info("=== Inicio: Procesamiento de Tablas FACT ===")
-    for anio in get_years_to_extract():
+    for anio in get_years_to_extract(YEARS_TO_EXTRACT):
         logger.info(f"Anio {anio} (FACT)")
         config_fact = load_table_tranform(anio, table_type="fact")
         for tcfg in config_fact.tables:
@@ -93,7 +96,7 @@ def transformacion_carga() -> None:
 
     #Después: todas las tablas DIMENSION, año por año
     logger.info("=== Inicio: Procesamiento de Tablas DIMENSION ===")
-    for anio in get_years_to_extract():
+    for anio in get_years_to_extract(YEARS_TO_EXTRACT):
         logger.info(f"Anio {anio} (DIMENSION)")
         config_dim = load_table_tranform(anio, table_type="dimension")
         for tcfg in config_dim.tables:

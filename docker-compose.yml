@@ -1,7 +1,6 @@
-# Aquí definimos todos nuestros contenedores (servicios)
 services:
 
-  # --- 1. El Almacén (Base de Datos) ---
+  # (Base de Datos)
   database:
     image: postgres:15-alpine # Una imagen ligera de Postgres
     container_name: prefect-postgres-db
@@ -11,19 +10,19 @@ services:
       POSTGRES_PASSWORD: prefect
       POSTGRES_DB: prefect
     volumes:
-      - prefect-db-data:/var/lib/postgresql/data # Para que tus datos persistan
+      - prefect-db-data:/var/lib/postgresql/data # Persistencia de datos
     restart: always
 
-  # --- 2. El Maître (Servidor Prefect) ---
+  # (Servidor Prefect)
   prefect-server:
     image: prefecthq/prefect:3-python3.13 # Imagen oficial de Prefect
     container_name: prefect-server-ui
     restart: always
     command: prefect server start --host 0.0.0.0 --port ${PREFECT_PORT}
     ports:
-      - "4200:4200" # Expone la UI a tu máquina en el puerto 4200
+      - "4200:4200" # UI Dashboard de prefect en local
     depends_on:
-      - database # No inicies el servidor hasta que la BD esté (casi) lista
+      - database # Esperar a que la base de datos haya iniciado
     environment:
       # ¡Conecta el servidor de Prefect a la BD de Postgres!
       PREFECT_DATABASE_CONNECTION_URL: ${PREFECT_API_DATABASE_CONNECTION_URL}
@@ -32,16 +31,17 @@ services:
       PREFECT_API_DATABASE_CONNECTION_URL: ${PREFECT_API_DATABASE_CONNECTION_URL}
       PREFECT_API_AUTH_STRING: ${PREFECT_API_AUTH_STRING}
       PREFECT_SERVER_API_AUTH_STRING: ${PREFECT_SERVER_API_AUTH_STRING}
+      PREFECT_SERVER_UI_SHOW_PROMOTIONAL_CONTENT: ${PREFECT_SERVER_UI_SHOW_PROMOTIONAL_CONTENT}
     
-  # --- 3. La Cocina (Tu Worker) ---
+  # (Worker)
   worker:
-    build: . # ¡Construye usando el Dockerfile en este directorio!
+    build: . # Construir usando el dockerfile
     container_name: mi-etl-sig-worker
     restart: always
     depends_on:
-      - prefect-server # No inicies el worker hasta que el servidor esté listo
+      - prefect-server # No iniciar el worker hasta que el servidor esté listo
     environment:
-      # ¡La magia! Conecta tu worker al servidor de Prefect.
+      # Conectar el worker al servidor de Prefect.
       # Usa el nombre del servicio 'prefect-server' como el host.
       PREFECT_API_URL: http://prefect-server:${PREFECT_PORT}/api
       PREFECT_API_AUTH_STRING: ${PREFECT_API_AUTH_STRING}
@@ -50,6 +50,10 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
+      SIG_EXTRACCION_ANIOS_HISTORICOS: ${SIG_EXTRACCION_ANIOS_HISTORICOS}
+      MINECO_AMIGABLE_BASE_URL: ${MINECO_AMIGABLE_BASE_URL}
+      MINECO_AMIGABLE_USER_AGENT: ${MINECO_AMIGABLE_USER_AGENT}
+      MINECO_AMIGABLE_REFERER: ${MINECO_AMIGABLE_REFERER}
 
 
 # Define el volumen que usará la base de datos para persistir

@@ -10,18 +10,20 @@ from urllib.parse import urljoin
 from prefect import task, get_run_logger
 from config.utils.textos import normalizar_texto
 from config.utils.scraping_aspnet import extract_payload_and_action, get_soup
+from config.env_config import settings
 
-URL_BASE = "https://apps5.mineco.gob.pe/transparencia/Navegador/Navegar_7.aspx"
-HEADERS = {
-    'User-Agent': 'Mozilla/5.0',
-    'Referer': URL_BASE
-}
+
 # Mapeo de código de fuente a valor real
 FUENTES_MAP = {'1': '00', '2': '09','3':'19', '4': '13', '5': '18'}
 
 
 @task(retries=2, retry_delay_seconds=10)
 def scrape_and_load_pim(year: str, target_table: str) -> pd.DataFrame:
+    HEADERS = {
+        "User-Agent": settings.mineco_amigable_user_agent,
+        "Referer": settings.mineco_amigable_referer
+    }
+    URL_BASE = settings.mineco_amigable_base_url
     """
     Toma un año y una tabla destino, hace todo el scraping de PIM→PÍA,
     concatena resultados y los carga vía COPY en la tabla destino.

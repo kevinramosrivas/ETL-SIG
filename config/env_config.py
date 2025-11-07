@@ -5,14 +5,10 @@ class Settings(BaseSettings):
     db_password: str
     db_host: str
     db_port: int
-    data_dir: str
-    quipushare : str 
-    share_username: str
-    share_password: str
-    recurso : str
-    file_name : str
-    path_local : str
-    path_extract : str
+    sig_extraccion_anios_historicos: int
+    mineco_amigable_base_url: str
+    mineco_amigable_user_agent:str
+    mineco_amigable_referer: str
     class Config:
         env_file = ".env"
         extra = "ignore"
