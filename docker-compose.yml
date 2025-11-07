@@ -1,0 +1,61 @@
+services:
+
+  # (Base de Datos)
+  database:
+    image: postgres:15-alpine # Una imagen ligera de Postgres
+    container_name: prefect-postgres-db
+    environment:
+      # Variables para crear la BD de Prefect
+      POSTGRES_USER: prefect
+      POSTGRES_PASSWORD: prefect
+      POSTGRES_DB: prefect
+    volumes:
+      - prefect-db-data:/var/lib/postgresql/data # Persistencia de datos
+    restart: always
+
+  # (Servidor Prefect)
+  prefect-server:
+    image: prefecthq/prefect:3-python3.13 # Imagen oficial de Prefect
+    container_name: prefect-server-ui
+    restart: always
+    command: prefect server start --host 0.0.0.0 --port ${PREFECT_PORT}
+    ports:
+      - "4200:4200" # UI Dashboard de prefect en local
+    depends_on:
+      - database # Esperar a que la base de datos haya iniciado
+    environment:
+      # ¡Conecta el servidor de Prefect a la BD de Postgres!
+      PREFECT_DATABASE_CONNECTION_URL: ${PREFECT_API_DATABASE_CONNECTION_URL}
+      # Le dice al servidor cuál es su propia URL (para la UI)
+      PREFECT_API_URL: http://127.0.0.1:${PREFECT_PORT}/api
+      PREFECT_API_DATABASE_CONNECTION_URL: ${PREFECT_API_DATABASE_CONNECTION_URL}
+      PREFECT_API_AUTH_STRING: ${PREFECT_API_AUTH_STRING}
+      PREFECT_SERVER_API_AUTH_STRING: ${PREFECT_SERVER_API_AUTH_STRING}
+      PREFECT_SERVER_UI_SHOW_PROMOTIONAL_CONTENT: ${PREFECT_SERVER_UI_SHOW_PROMOTIONAL_CONTENT}
+    
+  # (Worker)
+  worker:
+    build: . # Construir usando el dockerfile
+    container_name: mi-etl-sig-worker
+    restart: always
+    depends_on:
+      - prefect-server # No iniciar el worker hasta que el servidor esté listo
+    environment:
+      # Conectar el worker al servidor de Prefect.
+      # Usa el nombre del servicio 'prefect-server' como el host.
+      PREFECT_API_URL: http://prefect-server:${PREFECT_PORT}/api
+      PREFECT_API_AUTH_STRING: ${PREFECT_API_AUTH_STRING}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      SIG_EXTRACCION_ANIOS_HISTORICOS: ${SIG_EXTRACCION_ANIOS_HISTORICOS}
+      MINECO_AMIGABLE_BASE_URL: ${MINECO_AMIGABLE_BASE_URL}
+      MINECO_AMIGABLE_USER_AGENT: ${MINECO_AMIGABLE_USER_AGENT}
+      MINECO_AMIGABLE_REFERER: ${MINECO_AMIGABLE_REFERER}
+
+
+# Define el volumen que usará la base de datos para persistir
+volumes:
+  prefect-db-data:

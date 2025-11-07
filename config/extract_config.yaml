@@ -383,3 +383,72 @@ tables:
       IND_PROCESO: IND_PROCES
       ID_CLASIFICADOR: ID_CLASIFI
       ESTADO_ENVIO: ESTADO_ENV
+
+  - key: acumulado_presupuestal
+    source: ACUMULADO_PRESUPUESTAL.DBF
+    target: bytsscom_bytsiaf.acumulado_presupuestal
+    columns:
+      - ANO_EJE
+      - SEC_EJEC
+      - ORIGEN
+      - FUENTE_FIN
+      - CATEGORIA
+      - TIPO_TRANS
+      - GENERICA
+      - PIA
+      - MODIFICACION
+    field_map:
+      CATEGORIA: CATEGORIA_
+      MODIFICACION: MODIFICACI
+      
+  - key: especifica_detalle
+    source: ESPECIFICA_DET.DBF
+    target: bytsscom_bytsiaf.especifica_detalle
+    columns:
+      - ANO_EJE
+      - ID_CLASIFICADOR
+      - TIPO_TRANSACCION
+      - GENERICA
+      - SUBGENERICA
+      - SUBGENERICA_DET
+      - ESPECIFICA
+      - ESPECIFICA_DET
+      - DESCRIPCION
+      - AMBITO
+      - ESTADO
+      - EXCLUSIVO_TP
+    field_map:
+      TIPO_TRANSACCION: TIPO_TRANS
+      SUBGENERICA: SUBGENERIC
+      SUBGENERICA_DET: SUBGENERI2
+      ESPECIFICA_DET: ESPECIFIC2
+      ID_CLASIFICADOR: ID_CLASIFI
+      DESCRIPCION: DESCRIPCIO
+      EXCLUSIVO_TP: EXCLUSIVO_
+
+
+  - key: mpp_pca_x_especifica
+    source: MPP_PCA_X_ESPECIFICA.DBF
+    target: bytsscom_bytsiaf.mpp_pca_x_especifica
+    columns:
+      - ANO_EJE
+      - SEC_EJEC
+      - FUENTE_FINANC
+      - CATEGORIA_GASTO
+      - TIPO_TRANSACCION
+      - GENERICA
+      - ID_CLASIFICADOR
+      - MONTO_ASIGNADO
+      - MONTO_COMPROMETIDO
+      - MONTO_A_SOLICITADO
+      - MONTO_DE_SOLICITADO
+    field_map:
+      FUENTE_FINANC: FUENTE_FIN
+      CATEGORIA_GASTO: CATEGORIA_
+      TIPO_TRANSACCION: TIPO_TRANS
+      ESPECIFICA_DET: ESPECIFIC2
+      ID_CLASIFICADOR: ID_CLASIFI
+      MONTO_ASIGNADO: MONTO_ASIG
+      MONTO_COMPROMETIDO: MONTO_COMP
+      MONTO_A_SOLICITADO: MONTO_A_SO
+      MONTO_DE_SOLICITADO: MONTO_DE_S

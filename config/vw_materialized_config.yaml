@@ -1,0 +1,13 @@
+
+schema_name: 'sistema_informacion_gerencial'
+tables:
+  - vm_dm_area
+  - vm_dm_fuente
+  - vm_dm_generica
+  - vm_hechos_institucional_consolidados
+  - vm_dm_certificado
+  - vm_dm_expediente
+  - vm_hechos_pim
+  - vm_dm_pim_q20
+  - vm_pim_clasificador
+  - vm_search_clasificador_area

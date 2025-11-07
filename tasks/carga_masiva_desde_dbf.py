@@ -21,11 +21,11 @@ def carga_masiva_desde_dbf(
     logger = get_run_logger()
     logger.info(f"Iniciando bulk_load en tabla '{table}'. Truncate={truncate}.")
     start_time = time.time()
+    count = 0
+    tmp_path = None
 
     with conectar_bd(autocommit=False) as (conn,cursor):
         try:
-            # Crear CSV temporal
-            count = 0
             with tempfile.NamedTemporaryFile(
                 mode="w+", delete=False, suffix=".csv", encoding="utf-8", newline=""
             ) as tmp:
@@ -63,12 +63,16 @@ def carga_masiva_desde_dbf(
                 logger.info(f"Triggers reactivados en tabla '{table}'.")
             conn.commit()
         except (Exception) as e:
-            logger.error(f"Error durante la transaccion para '{table}'. Revirtiendo cambios (rollback)...")
             conn.rollback()
+            cursor.close()
+            conn.close()
+            logger.error(f"Error durante la transaccion para '{table}'. Revirtiendo cambios (rollback)...")
             raise e
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 os.remove(tmp_path)
             elapsed = round(time.time() - start_time, 2)
             logger.info(f"bulk_load completado: {count} registros en {elapsed}s.")
+            cursor.close()
+            conn.close()
             return True
